@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Environments and secrets
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Training artifacts (large files)
+output/
+checkpoints/
+wandb/
+*.safetensors
+*.bin
+*.pt
+*.gguf
+
+# Data cache
+data/
+*.jsonl
+!configs/*.jsonl
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
