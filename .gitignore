@@ -18,19 +18,35 @@ venv/
 .env.*
 !.env.example
 
-# Training artifacts (large files)
-output/
-checkpoints/
-wandb/
+# Model artifacts (downloaded weights, large binaries)
+# PORTRAITKIT_MODEL_DIR defaults to ./models; downloaded weights never enter history.
+# Root-anchored: a bare "models/" would also swallow src/portraitkit/models/.
+/models/
+*.onnx
 *.safetensors
 *.bin
 *.pt
+*.pth
 *.gguf
+*.tflite
+*.zip
+
+# Pipeline and benchmark output
+# Note: results/ is deliberately NOT ignored; leaderboard runs are versioned in-repo.
+/output/
+/checkpoints/
+/wandb/
 
 # Data cache
-data/
+/data/
 *.jsonl
 !configs/*.jsonl
+
+# Private and local-only material
+# Binding: no private image, crop, embedding, or per-identity record may enter this
+# repository or its history. Keep any such working material under private/ or .local/.
+private/
+.local/
 
 # OS and editor noise
 .DS_Store

@@ -7,6 +7,8 @@ coordinate correctness far more precisely than a real face ever could.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 from PIL import Image
@@ -63,3 +65,23 @@ def jpeg_bytes() -> bytes:
     buffer = BytesIO()
     Image.fromarray(noise_image(64, 48), mode="RGB").save(buffer, format="JPEG", quality=90)
     return buffer.getvalue()
+
+
+def write_tiny_onnx(path: Path, *, dynamic_batch: bool = False) -> Path:
+    """Write a minimal valid ONNX model for exercising the session factory.
+
+    Building the model here rather than checking one in keeps the session tests free of
+    binary fixtures and free of any network dependency, so CI covers the inference
+    boundary without downloading weights.
+    """
+    import onnx
+    from onnx import TensorProto, helper
+
+    batch: object = "batch" if dynamic_batch else 1
+    inputs = [helper.make_tensor_value_info("x", TensorProto.FLOAT, [batch, 3])]
+    outputs = [helper.make_tensor_value_info("y", TensorProto.FLOAT, [batch, 3])]
+    graph = helper.make_graph([helper.make_node("Identity", ["x"], ["y"])], "tiny", inputs, outputs)
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
+    model.ir_version = 9
+    onnx.save(model, str(path))
+    return path
