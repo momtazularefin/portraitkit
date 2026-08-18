@@ -7,6 +7,7 @@ callers can trap the whole library with a single ``except`` clause.
 from __future__ import annotations
 
 __all__ = [
+    "AnnotationError",
     "ConfigError",
     "ImageLoadError",
     "ModelError",
@@ -23,6 +24,10 @@ class PortraitKitError(Exception):
 
 class ConfigError(PortraitKitError):
     """Raised when configuration is missing, malformed, or contradictory."""
+
+
+class AnnotationError(PortraitKitError):
+    """Raised when an evaluation annotation set is missing, malformed, or inconsistent."""
 
 
 class ImageLoadError(PortraitKitError):

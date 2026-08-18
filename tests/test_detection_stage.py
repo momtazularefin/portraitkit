@@ -61,9 +61,15 @@ def face(
 class StubDetector:
     """Stands in for an adapter so stage logic is testable without a model."""
 
-    def __init__(self, faces: tuple[FaceDetection, ...], name: str = "stub") -> None:
+    def __init__(
+        self,
+        faces: tuple[FaceDetection, ...],
+        name: str = "stub",
+        config: DetectorConfig | None = None,
+    ) -> None:
         self._faces = faces
         self.name = name
+        self.config = config or DetectorConfig()
         self.info = SessionInfo(inputs=(), outputs=(), providers=("CPUExecutionProvider",))
 
     def detect(self, image_rgb: np.ndarray) -> tuple[FaceDetection, ...]:
