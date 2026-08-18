@@ -41,6 +41,9 @@ dependencies = [
   "onnxruntime>=1.19",
 ]
 
+[project.scripts]
+portraitkit = "portraitkit.cli:main"
+
 [dependency-groups]
 dev = [
   "onnx>=1.16",
