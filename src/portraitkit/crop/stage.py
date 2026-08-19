@@ -174,6 +174,7 @@ class CropStage:
             metadata={
                 "dpi": self.preset.dpi,
                 "output_size": list(self.preset.output_size.as_tuple()),
-                "head_height_ratio": round(plan.achieved_head_height_ratio, 4),
+                "head_length_ratio": round(plan.achieved_head_length_ratio, 4),
+                "face_centre_vertical": round(plan.achieved_face_centre_vertical, 4),
             },
         )

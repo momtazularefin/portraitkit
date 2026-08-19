@@ -1,16 +1,18 @@
 """Output presets and the published requirements behind them.
 
-Every numeric constant here is traceable to a public source, recorded in the preset's
-``source`` field. That discipline exists because portrait geometry is widely misquoted:
-the frequently repeated "ICAO says head height is 70-80 per cent of the photo" is a real
-requirement, but Doc 9303 states it for the portrait *printed in Zone V of the document*,
-not for the photograph an applicant submits.
+Every constraint here is traceable to a clause, recorded in the preset's ``source``
+field. The governing table is ISO/IEC 39794-5:2019, Annex D, Table D.8, which fixes the
+portrait's aspect ratio, where the face centre may sit, and how much of the frame the
+head may occupy. ICAO Doc 9303 Part 3 supplies the physical submission size, and
+ISO/IEC 39794-5:2019 D.1.4.2.4 supplies the inter-eye pixel counts.
 
-Doc 9303 Part 3 does not itself define submitted-portrait geometry. Section 3.9.1 defers
-it: portrait capturing "shall comply with relevant specifications outlined in
-[ISO/IEC 39794-5]". That standard is not free, so PortraitKit implements only what is
-publicly stated and marks anything beyond it as an estimate rather than a compliance
-claim. See decision D009.
+Table D.8 expresses its position constraints against **M**, the midpoint of the line
+through the two eye centres. That is directly measurable from a five-point landmark set,
+which is why this module can state position requirements as hard checks while head width
+and head length remain estimates.
+
+Only clause references and numeric values appear here. The standards themselves are
+licensed documents and are not reproduced; see `.pcp/references/20-standards-library.md`.
 """
 
 from __future__ import annotations
@@ -26,134 +28,164 @@ __all__ = ["DEFAULT_PRESET", "PRESETS", "CropPreset", "get_preset", "preset_name
 
 MM_PER_INCH: Final = 25.4
 
+# ISO/IEC 39794-5:2019, D.1.4.4 Table D.8.
+TABLE_D8_ASPECT_RATIO: Final = (0.74, 0.80)
+TABLE_D8_FACE_CENTRE_HORIZONTAL: Final = (0.45, 0.55)
+TABLE_D8_FACE_CENTRE_VERTICAL: Final = (0.30, 0.50)
+TABLE_D8_HEAD_WIDTH_RATIO: Final = (0.50, 0.75)
+TABLE_D8_HEAD_LENGTH_RATIO: Final = (0.60, 0.90)
+
+# ISO/IEC 39794-5:2019, D.1.4.5.4 relaxes two of the above for children up to eleven.
+CHILD_HEAD_LENGTH_RATIO: Final = (0.50, 0.90)
+CHILD_FACE_CENTRE_VERTICAL: Final = (0.30, 0.60)
+
+# ISO/IEC 39794-5:2019, D.1.4.2.4 inter-eye pixel counts.
+IED_LEGACY_PX: Final = 90
+IED_NEW_PASSPORT_PX: Final = 240
+
 
 def _mm_to_px(millimetres: float, dpi: int) -> int:
     return round(millimetres / MM_PER_INCH * dpi)
+
+
+def _midpoint(bounds: tuple[float, float]) -> float:
+    return (bounds[0] + bounds[1]) / 2.0
 
 
 @dataclass(frozen=True, slots=True)
 class CropPreset:
     """A named output geometry.
 
-    Attributes:
-        name: Preset identifier.
-        description: What the preset is for.
-        output_size: Pixel dimensions of the produced crop.
-        dpi: Print resolution the pixel dimensions correspond to.
-        head_height_ratio: Permitted crown-to-chin extent as a fraction of output
-            height, or ``None`` where no public requirement exists.
-        target_head_height_ratio: What the solver aims for, normally the midpoint of the
-            permitted range.
-        min_interocular_mm: Minimum inter-eye distance in millimetres, or ``None``.
-        centre_tolerance: Permitted horizontal offset of the face centre from the image
-            centre, as a fraction of output width.
-        crown_margin_share: Share of the leftover vertical space placed above the crown
-            rather than below the chin. Doc 9303 asks for a centred portrait with the
-            crown nearest the top edge, which any value at or below 0.5 satisfies; the
-            exact figure lives in ISO/IEC 39794-5 and is not public, so this defaults to
-            an even split and is left configurable per jurisdiction.
-        source: Citation for every constraint above.
-        makes_compliance_claim: Whether this preset targets a published standard. A
-            preset that does not must never be described as compliant.
+    Ranges are inclusive bounds as fractions. ``target_*`` values are what the solver
+    aims for and must lie inside their corresponding range.
     """
 
     name: str
     description: str
     output_size: ImageSize
     dpi: int
-    target_head_height_ratio: float
-    centre_tolerance: float
     source: str
-    crown_margin_share: float = 0.5
-    head_height_ratio: tuple[float, float] | None = None
-    min_interocular_mm: float | None = None
+
+    head_length_ratio: tuple[float, float] | None = None
+    """Permitted crown-to-chin extent as a fraction of image height (L/B)."""
+
+    target_head_length_ratio: float = 0.75
+    """What the solver aims for within :attr:`head_length_ratio`."""
+
+    face_centre_vertical: tuple[float, float] | None = None
+    """Permitted position of the eye-centre midpoint from the top edge (Mv/B)."""
+
+    target_face_centre_vertical: float = 0.40
+    """What the solver aims for within :attr:`face_centre_vertical`."""
+
+    face_centre_horizontal: tuple[float, float] | None = None
+    """Permitted position of the eye-centre midpoint from the left edge (Mh/A)."""
+
+    head_width_ratio: tuple[float, float] | None = None
+    """Permitted head width as a fraction of image width (W/A)."""
+
+    aspect_ratio_range: tuple[float, float] | None = None
+    """Permitted image width to height ratio (A/B)."""
+
+    min_interocular_px: float | None = None
+    """Minimum inter-eye distance in the produced output, in pixels."""
+
     makes_compliance_claim: bool = False
+    """Whether this preset targets a published standard. A preset that does not must
+    never be described as compliant."""
 
     def __post_init__(self) -> None:
-        if not 0.0 < self.target_head_height_ratio < 1.0:
-            msg = (
-                f"{self.name}: target_head_height_ratio must be in (0, 1), "
-                f"got {self.target_head_height_ratio}"
-            )
-            raise ValueError(msg)
-        if self.head_height_ratio is not None:
-            low, high = self.head_height_ratio
-            if not 0.0 < low <= high < 1.0:
-                msg = f"{self.name}: head_height_ratio must satisfy 0 < min <= max < 1"
+        for label, bounds in (
+            ("head_length_ratio", self.head_length_ratio),
+            ("face_centre_vertical", self.face_centre_vertical),
+            ("face_centre_horizontal", self.face_centre_horizontal),
+            ("head_width_ratio", self.head_width_ratio),
+            ("aspect_ratio_range", self.aspect_ratio_range),
+        ):
+            if bounds is not None and not 0.0 < bounds[0] <= bounds[1] < 1.0:
+                msg = f"{self.name}: {label} must satisfy 0 < min <= max < 1, got {bounds}"
                 raise ValueError(msg)
-            if not low <= self.target_head_height_ratio <= high:
+
+        for label, target, bounds in (
+            ("target_head_length_ratio", self.target_head_length_ratio, self.head_length_ratio),
+            (
+                "target_face_centre_vertical",
+                self.target_face_centre_vertical,
+                self.face_centre_vertical,
+            ),
+        ):
+            if not 0.0 < target < 1.0:
+                msg = f"{self.name}: {label} must be in (0, 1), got {target}"
+                raise ValueError(msg)
+            if bounds is not None and not bounds[0] <= target <= bounds[1]:
                 msg = (
-                    f"{self.name}: target_head_height_ratio "
-                    f"{self.target_head_height_ratio} lies outside its own permitted "
-                    f"range {self.head_height_ratio}"
+                    f"{self.name}: {label} of {target} lies outside its own permitted "
+                    f"range {bounds}"
                 )
                 raise ValueError(msg)
-        if not 0.0 <= self.crown_margin_share <= 0.5:
-            msg = (
-                f"{self.name}: crown_margin_share must be in [0, 0.5] so the crown stays "
-                f"nearest the top edge, got {self.crown_margin_share}"
-            )
-            raise ValueError(msg)
-        if self.makes_compliance_claim and self.head_height_ratio is None:
-            msg = f"{self.name}: a compliance-claiming preset must state a head-height range"
+
+        if self.makes_compliance_claim and self.head_length_ratio is None:
+            msg = f"{self.name}: a compliance-claiming preset must state a head-length range"
             raise ValueError(msg)
 
     @property
     def aspect_ratio(self) -> float:
-        """Width divided by height."""
+        """Actual width divided by height of the produced output."""
         return self.output_size.aspect_ratio
 
-    @property
-    def min_interocular_px(self) -> float | None:
-        """Minimum inter-eye distance in pixels at this preset's resolution."""
-        if self.min_interocular_mm is None:
-            return None
-        return self.min_interocular_mm / MM_PER_INCH * self.dpi
+
+_DOC_9303_SIZE: Final = "ICAO Doc 9303 Part 3, 3.9.1.2 (45.0 x 35.0 mm submission size)"
+_TABLE_D8: Final = (
+    "ISO/IEC 39794-5:2019, D.1.4.4 and Table D.8 (A/B, Mh/A, Mv/B, W/A, L/B); "
+    "D.1.4.2.4 (inter-eye pixel count)"
+)
+_WIDTH_MM: Final = 35.0
+_HEIGHT_MM: Final = 45.0
 
 
-# Doc 9303 Part 3, 3.9.1.2: submitted portraits should be 45.0 mm x 35.0 mm, and the
-# width-to-height ratio of the final image has a typical value of 7:9. At 300 ppi, the
-# scanning rate the same section recommends, that is 413 x 531 px.
-_ICAO_DPI: Final = 300
-_ICAO_WIDTH_MM: Final = 35.0
-_ICAO_HEIGHT_MM: Final = 45.0
+def _icao_preset(name: str, dpi: int, min_ied: int, note: str) -> CropPreset:
+    return CropPreset(
+        name=name,
+        description=f"Travel-document portrait, 35 x 45 mm at {dpi} ppi. {note}",
+        output_size=ImageSize(width=_mm_to_px(_WIDTH_MM, dpi), height=_mm_to_px(_HEIGHT_MM, dpi)),
+        dpi=dpi,
+        head_length_ratio=TABLE_D8_HEAD_LENGTH_RATIO,
+        target_head_length_ratio=0.75,
+        face_centre_vertical=TABLE_D8_FACE_CENTRE_VERTICAL,
+        target_face_centre_vertical=_midpoint(TABLE_D8_FACE_CENTRE_VERTICAL),
+        face_centre_horizontal=TABLE_D8_FACE_CENTRE_HORIZONTAL,
+        head_width_ratio=TABLE_D8_HEAD_WIDTH_RATIO,
+        aspect_ratio_range=TABLE_D8_ASPECT_RATIO,
+        min_interocular_px=float(min_ied),
+        source=f"{_TABLE_D8}. {_DOC_9303_SIZE}.",
+        makes_compliance_claim=True,
+    )
+
 
 _ENTRIES: tuple[CropPreset, ...] = (
-    CropPreset(
-        name="icao-portrait-35x45",
-        description=(
-            "Travel-document portrait at the submission size Doc 9303 recommends, "
-            "35 x 45 mm at 300 ppi."
+    _icao_preset(
+        "icao-portrait-35x45",
+        dpi=300,
+        min_ied=IED_LEGACY_PX,
+        note=(
+            "Meets the legacy inter-eye pixel count. A 35 mm frame at 300 ppi cannot "
+            "reach the count required of new passport application processes; use the "
+            "600 ppi preset for those."
         ),
-        output_size=ImageSize(
-            width=_mm_to_px(_ICAO_WIDTH_MM, _ICAO_DPI),
-            height=_mm_to_px(_ICAO_HEIGHT_MM, _ICAO_DPI),
-        ),
-        dpi=_ICAO_DPI,
-        head_height_ratio=(0.70, 0.80),
-        target_head_height_ratio=0.75,
-        min_interocular_mm=10.0,
-        centre_tolerance=0.05,
-        source=(
-            "ICAO Doc 9303, Eighth Edition 2021, Part 3. Section 3.9.1.3 requires the "
-            "printed portrait to be centred with the crown, meaning the top of the head "
-            "ignoring any hair, nearest the top edge, and the crown-to-chin portion to "
-            "be 70 to 80 per cent of the longest dimension of Zone V. Section 3.9.1.2 "
-            "gives the 45.0 x 35.0 mm submission size, the 7:9 width-to-height ratio, "
-            "and requires that modifications be made by cropping and not by stretching. "
-            "Section 3.9.1.1 requires an inter-eye distance of at least 10 mm. Geometry "
-            "beyond these points is delegated by 3.9.1 to ISO/IEC 39794-5, which is not "
-            "publicly available."
-        ),
-        makes_compliance_claim=True,
+    ),
+    _icao_preset(
+        "icao-portrait-35x45-600",
+        dpi=600,
+        min_ied=IED_NEW_PASSPORT_PX,
+        note="Meets the inter-eye pixel count required of new passport application processes.",
     ),
     CropPreset(
         name="profile-square-512",
         description="Square portrait for a professional profile or CV. No standard applies.",
         output_size=ImageSize(width=512, height=512),
         dpi=72,
-        target_head_height_ratio=0.62,
-        centre_tolerance=0.08,
+        target_head_length_ratio=0.62,
+        target_face_centre_vertical=0.42,
         source=(
             "No published standard. The framing is a conventional headshot composition "
             "chosen by this project and carries no compliance meaning."

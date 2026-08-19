@@ -1,21 +1,24 @@
 """Head extent estimation and crop solving.
 
-The requirement is stated in terms of crown and chin. A five-point landmark set contains
-neither: it gives the eyes, the nose tip, and the mouth corners. Crown and chin are
-therefore *estimated*, and this module keeps that fact explicit rather than burying it,
-because a compliance claim resting on an estimate is not a compliance claim.
+ISO/IEC 39794-5:2019 Table D.8 states its position requirements against **M**, the
+midpoint of the line through the two eye centres. M is directly measurable from a
+five-point landmark set, so the crop can be positioned to a measured quantity rather than
+an inferred one. That is why this module solves for M's position and treats head length
+as a consequence rather than the other way round.
 
-The estimate is anchored on two distances Doc 9303 itself names. Section 3.9.1.3 says
-that where the printed image's height cannot be determined directly, the ratio between
-the inter-eye distance (IED) and the eye-to-mouth distance (EM) is what must be
-preserved. Both are directly measurable from the landmarks we have, which makes them the
-natural basis for inferring the rest of the head.
+Head length and head width are still estimates. The standard anticipates exactly this:
+where crown, chin, or ears cannot be located precisely, D.1.4.4 directs that a reasoned
+approximation be made. The estimates here are anchored on two measured distances the
+standards themselves use, the inter-eye distance (IED) and the eye-to-mouth distance
+(EM), and every value derived from them is labelled as estimated when it is assessed.
 
-The inference uses the classical proportion that the eye line sits near the vertical
-midpoint of the head, and that the mouth sits about two thirds of the way from the eye
-line to the chin. Those give eye-to-chin of roughly 1.5 EM and crown-to-eye of about the
-same, so crown-to-chin is roughly 3 EM. These are population averages; individual heads
-vary, which is precisely why the external referee in M2b exists.
+Proportions used:
+
+* Eye line to chin is about 1.5 EM, from the mouth sitting roughly two thirds of the way
+  from the eye line to the chin.
+* Eye line to crown is about the same, from the eye line sitting near the vertical
+  midpoint of the head.
+* Head width is about twice the IED, following the note in ISO/IEC 39794-5:2019, 7.48.
 """
 
 from __future__ import annotations
@@ -29,31 +32,35 @@ from portraitkit.types import BoundingBox, FaceLandmarks5, ImageSize, Point
 __all__ = [
     "CROWN_TO_EYE_PER_EM",
     "EYE_TO_CHIN_PER_EM",
+    "HEAD_WIDTH_PER_IED",
     "CropPlan",
     "HeadEstimate",
     "estimate_head",
+    "rotation_needed",
     "solve_crop",
 ]
 
 EYE_TO_CHIN_PER_EM: float = 1.5
-"""Eye line to chin, in units of eye-to-mouth distance. Follows from the mouth sitting
-about two thirds of the way from the eye line to the chin."""
+"""Eye line to chin, in units of eye-to-mouth distance."""
 
 CROWN_TO_EYE_PER_EM: float = 1.5
-"""Eye line to crown, in units of eye-to-mouth distance. Follows from the eye line
-sitting near the vertical midpoint of the head."""
+"""Eye line to crown, in units of eye-to-mouth distance."""
+
+HEAD_WIDTH_PER_IED: float = 2.0
+"""Head width in units of inter-eye distance, per ISO/IEC 39794-5:2019, 7.48."""
 
 
 @dataclass(frozen=True, slots=True)
 class HeadEstimate:
     """Head extent inferred from landmarks.
 
-    ``interocular_distance`` and ``eye_to_mouth`` are measured. ``crown``, ``chin`` and
-    ``height`` are inferred from them and carry the uncertainty described in the module
-    docstring.
+    ``eye_centre``, ``mouth_centre``, ``interocular_distance`` and ``eye_to_mouth`` are
+    measured. ``crown``, ``chin``, ``length`` and ``width`` are inferred from them.
     """
 
     eye_centre: Point
+    """M in ISO/IEC 39794-5 Table D.8: the midpoint of the line through the eye centres."""
+
     mouth_centre: Point
     crown: Point
     chin: Point
@@ -62,13 +69,18 @@ class HeadEstimate:
     roll_degrees: float
 
     @property
-    def height(self) -> float:
-        """Estimated crown-to-chin extent in pixels."""
+    def length(self) -> float:
+        """Estimated crown-to-chin extent in pixels. L in Table D.8."""
         return self.chin.y - self.crown.y
 
     @property
+    def width(self) -> float:
+        """Estimated ear-to-ear head width in pixels. W in Table D.8."""
+        return HEAD_WIDTH_PER_IED * self.interocular_distance
+
+    @property
     def ied_to_em_ratio(self) -> float:
-        """The ratio Doc 9303 3.9.1.3 requires a resize to preserve.
+        """The ratio ICAO Doc 9303 Part 3, 3.9.1.3 requires a resize to preserve.
 
         Cropping and uniform scaling both leave it unchanged, so a departure from the
         source value indicates the image was stretched.
@@ -80,7 +92,7 @@ class HeadEstimate:
 
 @dataclass(frozen=True, slots=True)
 class CropPlan:
-    """A crop rectangle in source-image coordinates, plus what it will take to realize it."""
+    """A crop rectangle in source-image coordinates, and what realizing it will take."""
 
     rect: BoundingBox
     """Region to extract. May extend beyond the source image; see :attr:`needs_padding`."""
@@ -98,10 +110,10 @@ class CropPlan:
     def needs_padding(self) -> bool:
         """Whether the rectangle reaches outside the source image.
 
-        A correctly framed portrait often requires canvas the original photograph does
-        not contain, particularly above the crown. Reporting it lets the caller decide
-        between padding the background and rejecting the photo, instead of silently
-        producing a crop that violates the geometry it claims to satisfy.
+        A correctly framed portrait often needs canvas the original photograph does not
+        contain, particularly above the crown. Reporting it lets the caller choose
+        between padding and rejecting the photo, rather than silently producing a crop
+        that violates the geometry it claims to satisfy.
         """
         return not self.rect.is_inside(self.source_size)
 
@@ -116,9 +128,24 @@ class CropPlan:
         )
 
     @property
-    def achieved_head_height_ratio(self) -> float:
-        """Estimated crown-to-chin extent as a fraction of the crop height."""
-        return self.head.height / self.rect.height
+    def achieved_head_length_ratio(self) -> float:
+        """L/B: estimated crown-to-chin extent as a fraction of crop height."""
+        return self.head.length / self.rect.height
+
+    @property
+    def achieved_head_width_ratio(self) -> float:
+        """W/A: estimated head width as a fraction of crop width."""
+        return self.head.width / self.rect.width
+
+    @property
+    def achieved_face_centre_vertical(self) -> float:
+        """Mv/B: eye-centre midpoint measured down from the top edge."""
+        return (self.head.eye_centre.y - self.rect.y1) / self.rect.height
+
+    @property
+    def achieved_face_centre_horizontal(self) -> float:
+        """Mh/A: eye-centre midpoint measured across from the left edge."""
+        return (self.head.eye_centre.x - self.rect.x1) / self.rect.width
 
 
 def estimate_head(landmarks: FaceLandmarks5) -> HeadEstimate:
@@ -142,9 +169,6 @@ def estimate_head(landmarks: FaceLandmarks5) -> HeadEstimate:
         msg = "cannot estimate head extent: eye landmarks coincide"
         raise ValueError(msg)
 
-    # Extend along the image vertical rather than along the head axis. The crop stage
-    # de-rotates a strongly rolled head before cropping, so by this point the two are
-    # close, and staying axis-aligned keeps the rectangle axis-aligned too.
     return HeadEstimate(
         eye_centre=eye_centre,
         mouth_centre=mouth_centre,
@@ -156,33 +180,26 @@ def estimate_head(landmarks: FaceLandmarks5) -> HeadEstimate:
     )
 
 
-def solve_crop(
-    head: HeadEstimate,
-    preset: CropPreset,
-    source_size: ImageSize,
-) -> CropPlan:
+def solve_crop(head: HeadEstimate, preset: CropPreset, source_size: ImageSize) -> CropPlan:
     """Compute the crop rectangle placing ``head`` as ``preset`` requires.
 
-    The rectangle is sized so the estimated crown-to-chin extent occupies the preset's
-    target fraction of the output height, then positioned to centre the head
-    horizontally and to distribute the leftover vertical space according to the preset's
-    ``crown_margin_share``. Doc 9303 3.9.1.3 asks for a centred portrait with the crown
-    nearest the top edge; the precise split is not public, so it is a preset parameter
-    rather than a constant invented here.
+    Height is chosen so the estimated crown-to-chin extent occupies the preset's target
+    L/B fraction. The rectangle is then positioned so the eye-centre midpoint M lands at
+    the preset's target Mv/B down from the top edge and at the horizontal centre, which
+    is what Table D.8 constrains. Width follows from the output aspect ratio.
 
     The rectangle is returned in source coordinates and is deliberately not clipped: a
-    caller needs to know that correct framing ran out of photograph. See
+    caller needs to know when correct framing ran out of photograph. See
     :attr:`CropPlan.needs_padding`.
     """
-    if head.height <= 0.0:
-        msg = f"head estimate has non-positive height: {head.height}"
+    if head.length <= 0.0:
+        msg = f"head estimate has non-positive length: {head.length}"
         raise ValueError(msg)
 
-    crop_height = head.height / preset.target_head_height_ratio
+    crop_height = head.length / preset.target_head_length_ratio
     crop_width = crop_height * preset.aspect_ratio
 
-    leftover = crop_height - head.height
-    top = head.crown.y - leftover * preset.crown_margin_share
+    top = head.eye_centre.y - preset.target_face_centre_vertical * crop_height
     left = head.eye_centre.x - crop_width / 2.0
 
     return CropPlan(
@@ -196,8 +213,8 @@ def solve_crop(
 def rotation_needed(head: HeadEstimate, tolerance_degrees: float) -> float:
     """Return the de-rotation angle in degrees, or 0.0 when the tilt is within tolerance.
 
-    Doc 9303 requires cropping rather than stretching, and rotating to level the eye line
-    before cropping keeps that promise: a rotation preserves the IED-to-EM ratio the
+    Doc 9303 Part 3, 3.9.1.2 requires cropping rather than stretching, and levelling the
+    eye line by rotation keeps that promise: a rotation preserves the IED-to-EM ratio the
     standard uses as its stretch check.
     """
     if math.isclose(head.roll_degrees, 0.0, abs_tol=tolerance_degrees):

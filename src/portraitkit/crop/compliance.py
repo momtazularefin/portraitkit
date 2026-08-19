@@ -1,15 +1,19 @@
 """Geometry conformance assessment.
 
-This module reports whether a crop satisfies the geometry PortraitKit can actually
-verify, and it labels every check with the strength of its evidence. A check whose input
-was measured from landmarks is worth more than one resting on an inferred crown and chin,
-and collapsing that difference into a single pass or fail would overstate what the
-project knows.
+Checks the produced crop against the constraints its preset declares, and labels every
+check with the strength of its evidence. A check whose inputs were measured from
+landmarks is worth more than one resting on an inferred crown, chin, or ear position, and
+collapsing that difference into a single pass or fail would overstate what is known.
 
-This is not a compliance certification. Doc 9303 delegates portrait geometry to
-ISO/IEC 39794-5 and face image quality is measured by ISO/IEC 29794-5, for which OFIQ is
-the reference implementation. Integrating that external referee is milestone M2b; until
-then these checks are PortraitKit grading its own geometry, and are described as such.
+Position checks against ISO/IEC 39794-5:2019 Table D.8 are measured, because the table
+constrains the eye-centre midpoint M and M comes straight from the landmarks. Head length
+and head width are estimated. The standard expects that: D.1.4.4 directs a reasoned
+approximation where crown, chin, or ears cannot be located precisely.
+
+This is not a compliance certification. Face image quality is measured by
+ISO/IEC 29794-5, for which OFIQ is the reference implementation, and integrating that
+external referee is milestone M2b. Until then these checks are PortraitKit grading its
+own geometry, and say so.
 """
 
 from __future__ import annotations
@@ -38,8 +42,8 @@ class CheckBasis(StrEnum):
     """Computed from landmarks the detector actually produced."""
 
     ESTIMATED = "estimated"
-    """Derived from inferred crown and chin positions, which carry population-average
-    error. A failure is informative; a pass is not proof."""
+    """Derived from inferred crown, chin, or ear positions, which carry
+    population-average error. A failure is informative; a pass is not proof."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +56,8 @@ class GeometryCheck:
     detail: str
     value: float | None = None
     permitted: tuple[float, float] | None = None
+    clause: str = ""
+    """The clause the requirement comes from, for a reviewer holding the standard."""
 
     @property
     def passed(self) -> bool:
@@ -82,7 +88,7 @@ class GeometryAssessment:
 
     @property
     def rests_on_estimates(self) -> bool:
-        """Whether any passing check depended on inferred crown and chin positions."""
+        """Whether any applicable check depended on an inferred head boundary."""
         return any(
             check.basis is CheckBasis.ESTIMATED and check.status is not CheckStatus.NOT_SPECIFIED
             for check in self.checks
@@ -102,6 +108,7 @@ class GeometryAssessment:
                     "basis": str(check.basis),
                     "value": None if check.value is None else round(check.value, 4),
                     "permitted": list(check.permitted) if check.permitted else None,
+                    "clause": check.clause,
                     "detail": check.detail,
                 }
                 for check in self.checks
@@ -114,7 +121,8 @@ def _range_check(
     value: float,
     permitted: tuple[float, float] | None,
     basis: CheckBasis,
-    unit: str,
+    clause: str,
+    unit: str = "",
 ) -> GeometryCheck:
     if permitted is None:
         return GeometryCheck(
@@ -123,65 +131,86 @@ def _range_check(
             basis=basis,
             detail="the active preset states no requirement for this property",
             value=value,
+            clause=clause,
         )
     low, high = permitted
     inside = low <= value <= high
+    high_text = "no upper bound" if high == float("inf") else f"{high:.4f}"
     return GeometryCheck(
         name=name,
         status=CheckStatus.PASS if inside else CheckStatus.FAIL,
         basis=basis,
         value=value,
         permitted=permitted,
+        clause=clause,
         detail=(
-            f"{value:.4f}{unit} is within the permitted {low:.4f} to {high:.4f}"
+            f"{value:.4f}{unit} is within the permitted {low:.4f} to {high_text}"
             if inside
-            else f"{value:.4f}{unit} is outside the permitted {low:.4f} to {high:.4f}"
+            else f"{value:.4f}{unit} is outside the permitted {low:.4f} to {high_text}"
         ),
     )
+
+
+_TABLE_D8 = "ISO/IEC 39794-5:2019, Table D.8"
+_IED_CLAUSE = "ISO/IEC 39794-5:2019, D.1.4.2.4"
+_STRETCH_CLAUSE = "ICAO Doc 9303 Part 3, 3.9.1.2"
 
 
 def assess_geometry(plan: CropPlan) -> GeometryAssessment:
     """Assess ``plan`` against its preset."""
     preset = plan.preset
     checks: list[GeometryCheck] = [
+        # L/B and W/A depend on inferred head boundaries.
         _range_check(
-            "head_height_ratio",
-            plan.achieved_head_height_ratio,
-            preset.head_height_ratio,
+            "head_length_ratio",
+            plan.achieved_head_length_ratio,
+            preset.head_length_ratio,
             CheckBasis.ESTIMATED,
-            "",
-        )
-    ]
-
-    # Horizontal centring: the face centre against the crop centre, as a fraction of
-    # crop width. Measured directly from the eye landmarks.
-    offset = abs(plan.head.eye_centre.x - plan.rect.center.x) / plan.rect.width
-    checks.append(
+            _TABLE_D8,
+        ),
         _range_check(
-            "horizontal_centring",
-            offset,
-            (0.0, preset.centre_tolerance),
+            "head_width_ratio",
+            plan.achieved_head_width_ratio,
+            preset.head_width_ratio,
+            CheckBasis.ESTIMATED,
+            _TABLE_D8,
+        ),
+        # Mv/B and Mh/A constrain the eye-centre midpoint, which is measured.
+        _range_check(
+            "face_centre_vertical",
+            plan.achieved_face_centre_vertical,
+            preset.face_centre_vertical,
             CheckBasis.MEASURED,
-            "",
-        )
-    )
-
-    # Inter-eye distance in the produced output, against the preset's minimum.
-    output_ied = plan.head.interocular_distance * plan.scale
-    minimum = preset.min_interocular_px
-    checks.append(
+            _TABLE_D8,
+        ),
+        _range_check(
+            "face_centre_horizontal",
+            plan.achieved_face_centre_horizontal,
+            preset.face_centre_horizontal,
+            CheckBasis.MEASURED,
+            _TABLE_D8,
+        ),
+        _range_check(
+            "aspect_ratio",
+            preset.aspect_ratio,
+            preset.aspect_ratio_range,
+            CheckBasis.MEASURED,
+            _TABLE_D8,
+        ),
         _range_check(
             "interocular_distance_px",
-            output_ied,
-            None if minimum is None else (minimum, float("inf")),
+            plan.head.interocular_distance * plan.scale,
+            None
+            if preset.min_interocular_px is None
+            else (preset.min_interocular_px, float("inf")),
             CheckBasis.MEASURED,
-            " px",
-        )
-    )
+            _IED_CLAUSE,
+            unit=" px",
+        ),
+    ]
 
-    # Doc 9303 3.9.1.2 requires modification by cropping, not stretching. A uniform
-    # scale leaves the IED-to-EM ratio untouched, so comparing it before and after is a
-    # direct check that no stretch crept in.
+    # A uniform scale leaves the IED-to-EM ratio untouched, so comparing it before and
+    # after is a direct check that no stretch crept in.
     source_ratio = plan.head.ied_to_em_ratio
     output_ratio = (
         (plan.head.interocular_distance * plan.scale) / (plan.head.eye_to_mouth * plan.scale)
@@ -195,6 +224,7 @@ def assess_geometry(plan: CropPlan) -> GeometryAssessment:
             status=CheckStatus.PASS if drift < 1e-6 else CheckStatus.FAIL,
             basis=CheckBasis.MEASURED,
             value=drift,
+            clause=_STRETCH_CLAUSE,
             detail=(
                 "the ratio of inter-eye to eye-to-mouth distance is unchanged, so the "
                 "image was cropped and uniformly scaled rather than stretched"
@@ -205,7 +235,6 @@ def assess_geometry(plan: CropPlan) -> GeometryAssessment:
         )
     )
 
-    # Whether correct framing fits inside the photograph that was actually supplied.
     left, top, right, bottom = plan.padding
     needed = max(left, top, right, bottom)
     checks.append(
@@ -217,8 +246,8 @@ def assess_geometry(plan: CropPlan) -> GeometryAssessment:
             detail=(
                 "the required crop lies entirely inside the source photograph"
                 if not plan.needs_padding
-                else f"correct framing needs {needed:.0f} px of canvas the source does not have "
-                f"(left {left:.0f}, top {top:.0f}, right {right:.0f}, bottom {bottom:.0f})"
+                else f"correct framing needs {needed:.0f} px of canvas the source does not "
+                f"have (left {left:.0f}, top {top:.0f}, right {right:.0f}, bottom {bottom:.0f})"
             ),
         )
     )
