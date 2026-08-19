@@ -42,6 +42,12 @@ venv/
 *.jsonl
 !configs/*.jsonl
 
+# Licensed third-party standards. These are purchased single-user documents and must
+# never enter a public repository. Keep them outside the project entirely; these rules
+# are a second line of defence, not the primary one.
+standards/
+*.pdf
+
 # Private and local-only material
 # Binding: no private image, crop, embedding, or per-identity record may enter this
 # repository or its history. Keep any such working material under private/ or .local/.
