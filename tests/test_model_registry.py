@@ -7,6 +7,7 @@ import pytest
 from portraitkit.errors import ModelError
 from portraitkit.models.registry import (
     DEFAULT_DETECTOR,
+    DEFAULT_MATTER,
     MODELS,
     ModelSpec,
     get_model,
@@ -22,6 +23,13 @@ def test_lookup_returns_the_matching_spec() -> None:
     spec = get_model(DEFAULT_DETECTOR)
 
     assert spec.name == DEFAULT_DETECTOR
+    assert spec.filename.endswith(".onnx")
+
+
+def test_lookup_matter_returns_matching_spec() -> None:
+    spec = get_model(DEFAULT_MATTER)
+
+    assert spec.name == DEFAULT_MATTER
     assert spec.filename.endswith(".onnx")
 
 
@@ -64,6 +72,10 @@ def test_default_detector_is_registered() -> None:
     assert DEFAULT_DETECTOR in MODELS
 
 
+def test_default_matter_is_registered() -> None:
+    assert DEFAULT_MATTER in MODELS
+
+
 def test_default_detector_permits_commercial_use() -> None:
     """PortraitKit is MIT, so its default path must not carry a research-only weight.
 
@@ -72,6 +84,11 @@ def test_default_detector_permits_commercial_use() -> None:
     license promise misleading for the integrators it targets.
     """
     assert get_model(DEFAULT_DETECTOR).permits_commercial_use
+
+
+def test_default_matter_permits_commercial_use() -> None:
+    """The default matting model must also permit commercial use."""
+    assert get_model(DEFAULT_MATTER).permits_commercial_use
 
 
 def test_research_only_entries_explain_the_restriction() -> None:

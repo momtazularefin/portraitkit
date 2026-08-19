@@ -150,3 +150,18 @@ def test_layout_changes_which_axes_are_checked() -> None:
     nhwc.validate_against(make_info((1, 8, 8, 3)))
     with pytest.raises(ModelError, match="declares three channels"):
         nhwc.validate_against(make_info((1, 3, 8, 8)))
+
+
+def test_stretch_mode_builds_stretched_tensor_without_padding() -> None:
+    contract = make_contract(
+        input_size=ImageSize(width=64, height=64),
+        resize_mode=ResizeMode.BILINEAR_STRETCH,
+    )
+
+    tensor, transform = contract.build_input(solid_image(width=128, height=64))
+
+    assert tensor.shape == (1, 3, 64, 64)
+    assert transform.pad_x == 0.0
+    assert transform.pad_y == 0.0
+    assert transform.effective_scale_x == pytest.approx(0.5)
+    assert transform.effective_scale_y == pytest.approx(1.0)

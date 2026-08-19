@@ -18,7 +18,7 @@ import portraitkit.cli as cli
 from portraitkit import __version__
 from portraitkit.cli import EXIT_ERROR, EXIT_OK, build_parser, main
 from portraitkit.config import load_settings
-from portraitkit.models.registry import DEFAULT_DETECTOR
+from portraitkit.models.registry import DEFAULT_DETECTOR, model_names
 from portraitkit.models.store import is_cached
 from tests.conftest import solid_image
 
@@ -138,7 +138,7 @@ def test_models_json_is_machine_readable() -> None:
     payload = json.loads(output)
     assert code == EXIT_OK
     names = {entry["name"] for entry in payload["models"]}
-    assert names == {"yunet-2023mar", "scrfd-10g-bnkps"}
+    assert names == set(model_names())
     for entry in payload["models"]:
         assert "license" in entry
         assert isinstance(entry["permits_commercial_use"], bool)

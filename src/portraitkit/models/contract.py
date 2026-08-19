@@ -25,7 +25,7 @@ from enum import StrEnum
 import numpy as np
 
 from portraitkit.errors import ModelError
-from portraitkit.imaging.geometry import ResizeTransform, letterbox
+from portraitkit.imaging.geometry import ResizeTransform, letterbox, stretch
 from portraitkit.models.session import SessionInfo
 from portraitkit.types import ImageSize
 
@@ -55,6 +55,10 @@ class ResizeMode(StrEnum):
 
     LETTERBOX_CENTER = "letterbox_center"
     """Aspect-preserving scale, padded symmetrically."""
+
+    BILINEAR_STRETCH = "bilinear_stretch"
+    """Direct anisotropic resize to input_size without padding. Stretches the image to fit
+    the target canvas dimensions."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,11 +94,14 @@ class PreprocessContract:
             The input tensor and the transform needed to map predictions back to
             source-image coordinates.
         """
-        canvas, transform = letterbox(
-            image_rgb,
-            self.input_size,
-            center=self.resize_mode is ResizeMode.LETTERBOX_CENTER,
-        )
+        if self.resize_mode is ResizeMode.BILINEAR_STRETCH:
+            canvas, transform = stretch(image_rgb, self.input_size)
+        else:
+            canvas, transform = letterbox(
+                image_rgb,
+                self.input_size,
+                center=self.resize_mode is ResizeMode.LETTERBOX_CENTER,
+            )
 
         if self.color_order is ColorOrder.BGR:
             canvas = canvas[:, :, ::-1]
