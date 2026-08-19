@@ -146,12 +146,32 @@ Honest scope: these are engineering-validation results, not benchmark results.
   aggregate is [versioned here](results/m2b-ofiq-synthetic-v1.json).
 
 The crop run also found a negative result worth keeping visible: median OFIQ top- and
-bottom-margin scores fell by 52.0 and 97.5. PortraitKit's preset targets the licensed
-ISO/IEC 39794-5 Table D.8 geometry; OFIQ measures ISO/IEC 29794-5 face-image quality. One
-does not certify the other, and this sample shows that satisfying the former can conflict
-with preferences measured by the latter. The unified score improved only slightly and on
-five of ten samples, so this is engineering evidence, not a claim that every input gets
-better.
+bottom-margin scores fell by 52.0 and 97.5. That is not a defect in the crop, and it is
+not simply a case of two standards disagreeing -- ISO/IEC 29794-5 states that both margin
+measures derive from ISO/IEC 39794-5 D.1.4.4, the same clause Table D.8 belongs to. The
+real cause is arithmetic, and it is structural.
+
+Write `T` for the eye-to-chin distance, `B` for image height, and `Y` for the eye line's
+height from the top edge. OFIQ's head-size measure is `T/B`, scored best near 0.45. Its
+margin measures are `Y/T` and `(B-Y)/T`, each scored 50 at 1.4 and 1.8 respectively. But
+those two quantities sum to `B/T` identically, so scoring 50 on both requires
+`B/T >= 3.2`, meaning `T/B <= 0.3125`. At that head size the head-size measure itself
+falls to 12 out of 100. **The three components cannot be satisfied together.** Worse for
+this preset, Table D.8 fixes crown-to-chin between 60 and 90 per cent of image height,
+which on measured data keeps `T/B` above roughly 0.35 -- so a Table D.8-conformant crop
+cannot reach the margin thresholds at all.
+
+Measured on one of these crops, OFIQ reports `T/B = 0.4418` (head size 92 of 100),
+`Y/T = 0.9036` and `(B-Y)/T = 1.3597` (both margins 1 of 100). Those two native values sum
+to 2.2633, which is exactly `1/0.4418`. Recomputing the published formulas from the
+standard reproduces OFIQ's scalars of 92, 1 and 1 exactly, so the tension is in the
+measures themselves rather than in this implementation of them.
+
+This is the first genuine PortraitBench result: a conformant geometry crop is penalised by
+the reference quality implementation's own margin components, because those components are
+mutually unsatisfiable with its head-size component. It is exactly the kind of finding an
+independent referee exists to surface. The unified score improved only slightly and on
+five of ten samples, so none of this is a claim that every input gets better.
 
 The sample selection is CC-BY-4.0 synthetic imagery pinned by URL, size, SHA-256, and
 upstream Git revision in
