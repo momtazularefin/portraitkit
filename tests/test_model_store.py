@@ -43,6 +43,7 @@ def make_settings(tmp_path: Path, *, allow_download: bool = False) -> Settings:
         model_dir=tmp_path / "models",
         data_dir=tmp_path / "data",
         output_dir=tmp_path / "output",
+        ofiq_dir=tmp_path / "models" / "ofiq",
         allow_download=allow_download,
     )
 

@@ -34,12 +34,15 @@ class Settings:
     output_dir: Path
     """Destination for pipeline output and benchmark reports."""
 
+    ofiq_dir: Path
+    """Cache directory for the optional external OFIQ reference package."""
+
     allow_download: bool
     """Whether missing model artifacts may be fetched over the network."""
 
     def ensure_directories(self) -> None:
         """Create the configured directories if they do not exist."""
-        for directory in (self.model_dir, self.data_dir, self.output_dir):
+        for directory in (self.model_dir, self.data_dir, self.output_dir, self.ofiq_dir):
             directory.mkdir(parents=True, exist_ok=True)
 
 
@@ -75,9 +78,12 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         ConfigError: If a boolean-valued variable cannot be parsed.
     """
     source = os.environ if env is None else env
+    model_dir = _read_path(source, "PORTRAITKIT_MODEL_DIR", "./models")
+    ofiq_raw = source.get("PORTRAITKIT_OFIQ_DIR", "").strip()
     return Settings(
-        model_dir=_read_path(source, "PORTRAITKIT_MODEL_DIR", "./models"),
+        model_dir=model_dir,
         data_dir=_read_path(source, "PORTRAITKIT_DATA_DIR", "./data"),
         output_dir=_read_path(source, "PORTRAITKIT_OUTPUT_DIR", "./output"),
+        ofiq_dir=Path(ofiq_raw).expanduser() if ofiq_raw else model_dir / "ofiq",
         allow_download=_read_bool(source, "PORTRAITKIT_ALLOW_DOWNLOAD", default=True),
     )

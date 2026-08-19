@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "name": "stable-diffusion-face-dataset-10-synthetic",
+    "manifest_sha256": "d29ea6c0e388c910fe3c71fab001682913da06b86d33818782bae188630a4c98",
+    "source_revision": "c7a965ad35d8a19f5630706025d9380216f65df1",
+    "license": "CC-BY-4.0",
+    "license_url": "https://github.com/tobecwb/stable-diffusion-face-dataset/blob/c7a965ad35d8a19f5630706025d9380216f65df1/LICENSE.txt"
+  },
+  "input_set_sha256": "2d80c70a2eee0c9855f9cdbd36ff47c3141385c2c2e006d9c3ed2f4cf9eaa7d6",
+  "input_count": 10,
+  "scored_pairs": 10,
+  "conforming_crops": 9,
+  "padded_crops": 1,
+  "failures": {},
+  "detector": {
+    "name": "yunet-2023mar",
+    "artifact_sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+  },
+  "crop_preset": "icao-portrait-35x45",
+  "measures": {
+    "UnifiedQualityScore": {
+      "pairs": 10,
+      "before_mean": 50.8,
+      "after_mean": 51.6,
+      "before_median": 49.0,
+      "after_median": 50.5,
+      "mean_delta": 0.8,
+      "median_delta": 0.5,
+      "improved": 5,
+      "unchanged": 0,
+      "worsened": 5
+    },
+    "InterEyeDistance": {
+      "pairs": 10,
+      "before_mean": 79.4,
+      "after_mean": 95.5,
+      "before_median": 80.5,
+      "after_median": 96.0,
+      "mean_delta": 16.1,
+      "median_delta": 16.0,
+      "improved": 6,
+      "unchanged": 0,
+      "worsened": 4
+    },
+    "HeadSize": {
+      "pairs": 10,
+      "before_mean": 9.5,
+      "after_mean": 66.7,
+      "before_median": 0.5,
+      "after_median": 70.5,
+      "mean_delta": 57.2,
+      "median_delta": 63.5,
+      "improved": 9,
+      "unchanged": 0,
+      "worsened": 1
+    },
+    "LeftwardCropOfTheFaceImage": {
+      "pairs": 10,
+      "before_mean": 100.0,
+      "after_mean": 100.0,
+      "before_median": 100.0,
+      "after_median": 100.0,
+      "mean_delta": 0.0,
+      "median_delta": 0.0,
+      "improved": 0,
+      "unchanged": 10,
+      "worsened": 0
+    },
+    "RightwardCropOfTheFaceImage": {
+      "pairs": 10,
+      "before_mean": 100.0,
+      "after_mean": 100.0,
+      "before_median": 100.0,
+      "after_median": 100.0,
+      "mean_delta": 0.0,
+      "median_delta": 0.0,
+      "improved": 0,
+      "unchanged": 10,
+      "worsened": 0
+    },
+    "MarginAboveOfTheFaceImage": {
+      "pairs": 10,
+      "before_mean": 54.5,
+      "after_mean": 2.2,
+      "before_median": 53.5,
+      "after_median": 2.0,
+      "mean_delta": -52.3,
+      "median_delta": -52.0,
+      "improved": 1,
+      "unchanged": 0,
+      "worsened": 9
+    },
+    "MarginBelowOfTheFaceImage": {
+      "pairs": 10,
+      "before_mean": 90.3,
+      "after_mean": 2.5,
+      "before_median": 100.0,
+      "after_median": 1.5,
+      "mean_delta": -87.8,
+      "median_delta": -97.5,
+      "improved": 0,
+      "unchanged": 0,
+      "worsened": 10
+    },
+    "HeadPoseRoll": {
+      "pairs": 10,
+      "before_mean": 97.6,
+      "after_mean": 99.6,
+      "before_median": 99.5,
+      "after_median": 100.0,
+      "mean_delta": 2.0,
+      "median_delta": 0.5,
+      "improved": 5,
+      "unchanged": 5,
+      "worsened": 0
+    }
+  },
+  "ofiq": {
+    "version": "1.0.3",
+    "source_revision": "df8fbb5e4bd8de09ae998ff69bc252f6be4367f8",
+    "package_sha256": "c8996f37246731d7bd195697da04542b97cdf4e34a5d43ea1ab6a3138c4620ce",
+    "executable_sha256": "79a05b88976a7c67934135580fe86dda8041a2f28de7b879a4923516f6d7c54c",
+    "config_sha256": "e117286706d799a1e23130db01cfdff7ef36d157b22ecf68dd196052a8a8d0b3",
+    "models_sha256": "a9a74dc0cfd960856e37cbf35cb3d62e086d70bd8a2e6d2b84451231f3b64654",
+    "platform": "win64"
+  }
+}

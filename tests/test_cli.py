@@ -9,10 +9,12 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
 
+import portraitkit.cli as cli
 from portraitkit import __version__
 from portraitkit.cli import EXIT_ERROR, EXIT_OK, build_parser, main
 from portraitkit.config import load_settings
@@ -88,6 +90,20 @@ def test_unknown_model_is_rejected_by_the_parser() -> None:
 def test_unknown_selection_strategy_is_rejected() -> None:
     with pytest.raises(SystemExit):
         main(["detect", "a.jpg", "--selection", "prettiest"])
+
+
+def test_ofiq_requires_a_nested_command() -> None:
+    with pytest.raises(SystemExit):
+        main(["ofiq"])
+
+
+def test_ofiq_crop_evaluation_accepts_public_samples() -> None:
+    arguments = build_parser().parse_args(["ofiq", "evaluate-crop", "a.jpg", "b.jpg", "--offline"])
+
+    assert arguments.ofiq_command == "evaluate-crop"
+    assert [path.name for path in arguments.images] == ["a.jpg", "b.jpg"]
+    assert arguments.preset == "icao-portrait-35x45"
+    assert arguments.offline is True
 
 
 # --- models ---------------------------------------------------------------------------
@@ -210,3 +226,73 @@ def test_evaluate_runs_and_writes_a_report(
     assert payload["dataset"] == "blank-set"
     assert payload["summary"]["evaluated_images"] == 1
     assert payload["summary"]["primary_accuracy"] is None
+
+
+# --- OFIQ -----------------------------------------------------------------------------
+
+
+def test_ofiq_fetch_reports_pinned_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
+    provenance = SimpleNamespace(
+        version="1.0.3",
+        package_sha256="a" * 64,
+        to_dict=lambda: {"version": "1.0.3", "package_sha256": "a" * 64},
+    )
+    installation = SimpleNamespace(
+        root=Path("models/ofiq/1.0.3/OFIQ-Release"),
+        provenance=lambda: provenance,
+    )
+    observed: dict[str, object] = {}
+
+    def resolve(**kwargs):
+        observed.update(kwargs)
+        return installation
+
+    monkeypatch.setattr(cli, "resolve_reference_ofiq", resolve)
+
+    code, output = run("ofiq", "fetch", "--json")
+
+    payload = json.loads(output)
+    assert code == EXIT_OK
+    assert observed == {"allow_download": True}
+    assert payload["provenance"]["version"] == "1.0.3"
+    assert payload["installation"].endswith("OFIQ-Release")
+
+
+def test_ofiq_score_is_offline_capable_and_writes_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    input_path = tmp_path / "face.png"
+    target = tmp_path / "reports" / "ofiq.json"
+    measurement = SimpleNamespace(name="UnifiedQualityScore", native_score=71.0, scalar_score=82.0)
+    result = SimpleNamespace(
+        image=input_path,
+        measurements=(measurement,),
+        to_dict=lambda: {
+            "image": str(input_path),
+            "measurements": {"UnifiedQualityScore": {"scalar_score": 82.0}},
+        },
+    )
+    installation = object()
+    observed: dict[str, object] = {}
+
+    def resolve(**kwargs):
+        observed.update(kwargs)
+        return installation
+
+    class FakeScorer:
+        def __init__(self, selected_installation: object):
+            assert selected_installation is installation
+
+        def score(self, selected_input: Path):
+            assert selected_input == input_path
+            return (result,)
+
+    monkeypatch.setattr(cli, "resolve_reference_ofiq", resolve)
+    monkeypatch.setattr(cli, "OfiqScorer", FakeScorer)
+
+    code, output = run("ofiq", "score", str(input_path), "--offline", "--output", str(target))
+
+    assert code == EXIT_OK
+    assert observed == {"allow_download": False}
+    assert "UnifiedQualityScore: scalar 82" in output
+    assert json.loads(target.read_text(encoding="utf-8"))["results"][0]["image"] == str(input_path)

@@ -1,9 +1,7 @@
 """Command-line interface.
 
-Four verbs, each mapping to one thing a user actually wants: see which models exist and
-what they cost you legally, fetch one, run detection, or score the stage against ground
-truth. Everything is available as JSON so the CLI composes with other tools rather than
-only being read by a person.
+Commands cover model discovery, detection evaluation, and the optional external OFIQ
+quality referee. Machine-readable output keeps each workflow composable.
 """
 
 from __future__ import annotations
@@ -17,12 +15,17 @@ from typing import Any
 
 from portraitkit import __version__
 from portraitkit.config import load_settings
+from portraitkit.crop.ofiq import CROP_QUALITY_MEASURES, OfiqScorer, resolve_reference_ofiq
+from portraitkit.crop.presets import preset_names
+from portraitkit.crop.stage import CropConfig, CropStage
 from portraitkit.detection.base import DetectorConfig
 from portraitkit.detection.selection import SelectionStrategy
 from portraitkit.detection.stage import DetectionStage, StageConfig, build_detector
-from portraitkit.errors import PortraitKitError
+from portraitkit.errors import AnnotationError, PortraitKitError
 from portraitkit.eval.annotations import load_annotations
+from portraitkit.eval.crop import evaluate_crop_quality
 from portraitkit.eval.runner import evaluate_detection
+from portraitkit.eval.samples import resolve_public_samples
 from portraitkit.imaging.io import load_image
 from portraitkit.models.registry import DEFAULT_DETECTOR, MODELS, model_names
 from portraitkit.models.store import cached_path, is_cached, resolve_model
@@ -99,6 +102,39 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate.add_argument("--output", type=Path, help="write the JSON report to this file")
     _detector_options(evaluate)
+
+    ofiq = subcommands.add_parser(
+        "ofiq", help="manage and run the pinned external OFIQ quality referee"
+    )
+    ofiq_commands = ofiq.add_subparsers(dest="ofiq_command", required=True)
+
+    ofiq_fetch = ofiq_commands.add_parser(
+        "fetch", help="install the official pinned OFIQ reference package"
+    )
+    ofiq_fetch.add_argument("--json", action="store_true", help="emit provenance as JSON")
+
+    ofiq_score = ofiq_commands.add_parser(
+        "score", help="score one image or an image directory with OFIQ"
+    )
+    ofiq_score.add_argument("input", type=Path, help="image file or directory to score")
+    ofiq_score.add_argument("--offline", action="store_true", help="never download OFIQ")
+    ofiq_score.add_argument("--json", action="store_true", help="emit JSON instead of text")
+    ofiq_score.add_argument("--output", type=Path, help="write the JSON results to this file")
+
+    ofiq_evaluate = ofiq_commands.add_parser(
+        "evaluate-crop", help="measure aggregate OFIQ changes across public sample crops"
+    )
+    ofiq_evaluate.add_argument("images", nargs="*", type=Path, help="public sample images")
+    ofiq_evaluate.add_argument(
+        "--manifest", type=Path, help="download and verify a pinned public sample manifest"
+    )
+    ofiq_evaluate.add_argument(
+        "--dataset", default="public-samples", help="identity-free dataset label for the report"
+    )
+    ofiq_evaluate.add_argument("--preset", choices=preset_names(), default="icao-portrait-35x45")
+    ofiq_evaluate.add_argument("--json", action="store_true", help="emit JSON instead of text")
+    ofiq_evaluate.add_argument("--output", type=Path, help="write aggregate JSON to this file")
+    _detector_options(ofiq_evaluate)
 
     return parser
 
@@ -257,11 +293,116 @@ def _command_evaluate(arguments: argparse.Namespace, stream: Any) -> int:
     return EXIT_OK
 
 
+def _write_json_output(payload: dict[str, Any], target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(payload, indent=2, allow_nan=False) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
+def _command_ofiq(arguments: argparse.Namespace, stream: Any) -> int:
+    if arguments.ofiq_command == "fetch":
+        installation = resolve_reference_ofiq(allow_download=True)
+        provenance = installation.provenance()
+        payload = {
+            "installation": str(installation.root),
+            "provenance": provenance.to_dict(),
+        }
+        if arguments.json:
+            print(json.dumps(payload, indent=2), file=stream)
+        else:
+            print(
+                f"OFIQ {provenance.version} reference package ready at {installation.root}",
+                file=stream,
+            )
+            print(f"package sha256 {provenance.package_sha256}", file=stream)
+        return EXIT_OK
+
+    if arguments.ofiq_command == "score":
+        installation = resolve_reference_ofiq(allow_download=False if arguments.offline else None)
+        results = OfiqScorer(installation).score(arguments.input)
+        payload = {"results": [result.to_dict() for result in results]}
+        if arguments.json:
+            print(json.dumps(payload, indent=2, allow_nan=False), file=stream)
+        else:
+            for result in results:
+                print(result.image, file=stream)
+                measurements = {item.name: item for item in result.measurements}
+                for name in CROP_QUALITY_MEASURES:
+                    measurement = measurements.get(name)
+                    if measurement is not None:
+                        print(
+                            f"    {name}: scalar {measurement.scalar_score:g} "
+                            f"(native {measurement.native_score:g})",
+                            file=stream,
+                        )
+        if arguments.output:
+            _write_json_output(payload, arguments.output)
+            if not arguments.json:
+                print(f"wrote {arguments.output}", file=stream)
+        return EXIT_OK
+
+    installation = resolve_reference_ofiq(allow_download=False if arguments.offline else None)
+    detection = _build_stage(arguments)
+    crop = CropStage(CropConfig(preset=arguments.preset))
+    if bool(arguments.images) == bool(arguments.manifest):
+        raise AnnotationError("provide either public sample images or --manifest, not both")
+    dataset_provenance: dict[str, str] = {}
+    if arguments.manifest:
+        samples = resolve_public_samples(
+            arguments.manifest,
+            allow_download=False if arguments.offline else None,
+        )
+        images = samples.paths
+        dataset = samples.manifest.name
+        dataset_provenance = {
+            "manifest_sha256": samples.manifest_sha256,
+            "source_revision": samples.manifest.source_revision,
+            "license": samples.manifest.license,
+            "license_url": samples.manifest.license_url,
+        }
+    else:
+        images = tuple(arguments.images)
+        dataset = arguments.dataset
+
+    report = evaluate_crop_quality(
+        detection,
+        crop,
+        OfiqScorer(installation),
+        images,
+        dataset=dataset,
+        dataset_provenance=dataset_provenance,
+    )
+    payload = report.to_dict()
+    if arguments.json:
+        print(json.dumps(payload, indent=2, allow_nan=False), file=stream)
+    else:
+        print(
+            f"{report.dataset}: {report.scored_pairs}/{report.input_count} crops scored; "
+            f"{report.conforming_crops} geometry-conforming",
+            file=stream,
+        )
+        for name, aggregate in report.measures.items():
+            print(
+                f"    {name}: median {aggregate.before_median:g} -> "
+                f"{aggregate.after_median:g} ({aggregate.median_delta:+g})",
+                file=stream,
+            )
+    if arguments.output:
+        report.write(arguments.output)
+        if not arguments.json:
+            print(f"wrote {arguments.output}", file=stream)
+    return EXIT_OK
+
+
 _COMMANDS = {
     "models": _command_models,
     "fetch": _command_fetch,
     "detect": _command_detect,
     "evaluate": _command_evaluate,
+    "ofiq": _command_ofiq,
 }
 
 

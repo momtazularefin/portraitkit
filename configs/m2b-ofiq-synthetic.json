@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "name": "stable-diffusion-face-dataset-10-synthetic",
+  "source": "https://github.com/tobecwb/stable-diffusion-face-dataset",
+  "source_revision": "c7a965ad35d8a19f5630706025d9380216f65df1",
+  "license": "CC-BY-4.0",
+  "license_url": "https://github.com/tobecwb/stable-diffusion-face-dataset/blob/c7a965ad35d8a19f5630706025d9380216f65df1/LICENSE.txt",
+  "selection": "The first five 1024px files in each of the upstream man and woman directories.",
+  "samples": [
+    {
+      "id": "sample-001",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/man/men_0001.jpg",
+      "size_bytes": 479868,
+      "sha256": "739989f77f1557696ef90138aa5adb601944fdce32820dc88fde0fa969df4684"
+    },
+    {
+      "id": "sample-002",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/man/men_0002.jpg",
+      "size_bytes": 533270,
+      "sha256": "d5716797880ce387a3d2fb441593a25b4e210165d37497dd362fc1bab34abdbb"
+    },
+    {
+      "id": "sample-003",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/man/men_0003.jpg",
+      "size_bytes": 570374,
+      "sha256": "f0625effb78103a036d80fe0a3dde794343e912c8e6ca84fd12fb708c65eceee"
+    },
+    {
+      "id": "sample-004",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/man/men_0004.jpg",
+      "size_bytes": 469343,
+      "sha256": "c85496ce73d8b3fb67228ed5cab56a3b36ecac4adf74fc82dbf7f1b63ce6b8d5"
+    },
+    {
+      "id": "sample-005",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/man/men_0005.jpg",
+      "size_bytes": 706683,
+      "sha256": "080c77535b6a8bc75f9384cbe3f0fce2652062d406d789678cc3c4eaa9adf2a1"
+    },
+    {
+      "id": "sample-006",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/woman/woman_0001.jpg",
+      "size_bytes": 515140,
+      "sha256": "3cf149bc9f29e17a16d706ff259d64c067a9fc919d0411aa0ecf1cacb7dda53e"
+    },
+    {
+      "id": "sample-007",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/woman/woman_0002.jpg",
+      "size_bytes": 499016,
+      "sha256": "66372148415f56ea45ecbecd9c82cbff2542af3d7a4b44ab47f8bcbbb03b07bc"
+    },
+    {
+      "id": "sample-008",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/woman/woman_0003.jpg",
+      "size_bytes": 581581,
+      "sha256": "80acb1eae1c1b1c4a7e7841fb55c11c1987ec62421a8c7aed2b50e8ce39889c6"
+    },
+    {
+      "id": "sample-009",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/woman/woman_0004.jpg",
+      "size_bytes": 582966,
+      "sha256": "6232cf281c5b4ddd9bd77ac654d181088d108526256b2a547f3002524d1f2f5a"
+    },
+    {
+      "id": "sample-010",
+      "url": "https://raw.githubusercontent.com/tobecwb/stable-diffusion-face-dataset/c7a965ad35d8a19f5630706025d9380216f65df1/1024/woman/woman_0005.jpg",
+      "size_bytes": 541900,
+      "sha256": "ea4d4ea4d0ab1ab8b946a45404cc6a584c26db9cc8ab03519a8af08292025c30"
+    }
+  ]
+}

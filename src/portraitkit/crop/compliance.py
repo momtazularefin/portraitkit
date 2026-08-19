@@ -10,10 +10,10 @@ constrains the eye-centre midpoint M and M comes straight from the landmarks. He
 and head width are estimated. The standard expects that: D.1.4.4 directs a reasoned
 approximation where crown, chin, or ears cannot be located precisely.
 
-This is not a compliance certification. Face image quality is measured by
-ISO/IEC 29794-5, for which OFIQ is the reference implementation, and integrating that
-external referee is milestone M2b. Until then these checks are PortraitKit grading its
-own geometry, and say so.
+This is not a compliance certification. Face image quality is measured by ISO/IEC
+29794-5, for which pinned OFIQ 1.0.3 is the external reference implementation. OFIQ now
+supplies a separate quality evaluation twin, but these checks remain PortraitKit-authored
+geometry evidence and must not be presented as external certification.
 """
 
 from __future__ import annotations

@@ -13,6 +13,11 @@ __all__ = [
     "ModelError",
     "ModelIntegrityError",
     "ModelNotAvailableError",
+    "OfiqError",
+    "OfiqExecutionError",
+    "OfiqIntegrityError",
+    "OfiqNotAvailableError",
+    "OfiqOutputError",
     "PortraitKitError",
     "StageError",
 ]
@@ -52,3 +57,23 @@ class ModelNotAvailableError(ModelError):
 
 class ModelIntegrityError(ModelError):
     """Raised when a model artifact fails checksum verification."""
+
+
+class OfiqError(PortraitKitError):
+    """Base class for failures at the optional external OFIQ boundary."""
+
+
+class OfiqNotAvailableError(OfiqError):
+    """Raised when the pinned OFIQ reference package is not available locally."""
+
+
+class OfiqIntegrityError(OfiqError):
+    """Raised when an OFIQ package or installation fails provenance checks."""
+
+
+class OfiqExecutionError(OfiqError):
+    """Raised when the external OFIQ process cannot complete successfully."""
+
+
+class OfiqOutputError(OfiqError):
+    """Raised when OFIQ emits a missing, malformed, or contradictory report."""
