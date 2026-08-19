@@ -7,6 +7,7 @@ from portraitkit.crop.compliance import (
     GeometryCheck,
     assess_geometry,
 )
+from portraitkit.crop.derotate import Derotation, level_eye_line
 from portraitkit.crop.geometry import CropPlan, HeadEstimate, estimate_head, solve_crop
 from portraitkit.crop.presets import DEFAULT_PRESET, PRESETS, CropPreset, get_preset, preset_names
 from portraitkit.crop.stage import CropConfig, CropResult, CropStage, CropStatus
@@ -22,12 +23,14 @@ __all__ = [
     "CropResult",
     "CropStage",
     "CropStatus",
+    "Derotation",
     "GeometryAssessment",
     "GeometryCheck",
     "HeadEstimate",
     "assess_geometry",
     "estimate_head",
     "get_preset",
+    "level_eye_line",
     "preset_names",
     "solve_crop",
 ]

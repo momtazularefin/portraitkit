@@ -17,6 +17,7 @@ import cv2
 import numpy as np
 
 from portraitkit.crop.compliance import GeometryAssessment, assess_geometry
+from portraitkit.crop.derotate import Derotation, level_eye_line
 from portraitkit.crop.geometry import CropPlan, estimate_head, solve_crop
 from portraitkit.crop.presets import DEFAULT_PRESET, CropPreset, get_preset
 from portraitkit.imaging.io import LoadedImage
@@ -53,6 +54,13 @@ class CropConfig:
     background: tuple[int, int, int] = (255, 255, 255)
     """RGB fill used for added canvas."""
 
+    derotate: bool = True
+    """Level the eye line before solving geometry. A tilted head otherwise occupies more
+    vertical extent than its true crown-to-chin length and is framed wrongly."""
+
+    roll_tolerance_degrees: float = 1.0
+    """Tilt at or below which levelling is skipped."""
+
 
 @dataclass(frozen=True, slots=True)
 class CropResult:
@@ -66,6 +74,7 @@ class CropResult:
     plan: CropPlan | None = None
     assessment: GeometryAssessment | None = None
     padded: bool = False
+    derotation: Derotation | None = None
     duration_ms: float = 0.0
     metadata: dict[str, object] = field(default_factory=dict)
 
@@ -153,6 +162,15 @@ class CropStage:
         if landmarks is None:
             return finish(CropStatus.NO_LANDMARKS)
 
+        derotation: Derotation | None = None
+        if self.config.derotate:
+            pixels, landmarks, derotation = level_eye_line(
+                pixels,
+                landmarks,
+                tolerance_degrees=self.config.roll_tolerance_degrees,
+                background=self.config.background,
+            )
+
         try:
             head = estimate_head(landmarks)
         except ValueError:
@@ -162,7 +180,12 @@ class CropStage:
         plan = solve_crop(head, self.preset, source_size)
 
         if plan.needs_padding and not self.config.allow_padding:
-            return finish(CropStatus.PADDING_REQUIRED, plan=plan, assessment=assess_geometry(plan))
+            return finish(
+                CropStatus.PADDING_REQUIRED,
+                plan=plan,
+                assessment=assess_geometry(plan),
+                derotation=derotation,
+            )
 
         cropped = _resize(_extract(pixels, plan, self.config.background), self.preset.output_size)
         return finish(
@@ -171,10 +194,12 @@ class CropStage:
             plan=plan,
             assessment=assess_geometry(plan),
             padded=plan.needs_padding,
+            derotation=derotation,
             metadata={
                 "dpi": self.preset.dpi,
                 "output_size": list(self.preset.output_size.as_tuple()),
                 "head_length_ratio": round(plan.achieved_head_length_ratio, 4),
                 "face_centre_vertical": round(plan.achieved_face_centre_vertical, 4),
+                "derotated_degrees": round(derotation.angle_degrees, 3) if derotation else 0.0,
             },
         )

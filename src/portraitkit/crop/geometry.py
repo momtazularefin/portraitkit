@@ -23,7 +23,6 @@ Proportions used:
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 from portraitkit.crop.presets import CropPreset
@@ -36,7 +35,6 @@ __all__ = [
     "CropPlan",
     "HeadEstimate",
     "estimate_head",
-    "rotation_needed",
     "solve_crop",
 ]
 
@@ -208,15 +206,3 @@ def solve_crop(head: HeadEstimate, preset: CropPreset, source_size: ImageSize) -
         source_size=source_size,
         head=head,
     )
-
-
-def rotation_needed(head: HeadEstimate, tolerance_degrees: float) -> float:
-    """Return the de-rotation angle in degrees, or 0.0 when the tilt is within tolerance.
-
-    Doc 9303 Part 3, 3.9.1.2 requires cropping rather than stretching, and levelling the
-    eye line by rotation keeps that promise: a rotation preserves the IED-to-EM ratio the
-    standard uses as its stretch check.
-    """
-    if math.isclose(head.roll_degrees, 0.0, abs_tol=tolerance_degrees):
-        return 0.0
-    return -head.roll_degrees

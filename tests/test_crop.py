@@ -19,7 +19,6 @@ from portraitkit.crop.geometry import (
     EYE_TO_CHIN_PER_EM,
     HEAD_WIDTH_PER_IED,
     estimate_head,
-    rotation_needed,
     solve_crop,
 )
 from portraitkit.crop.presets import (
@@ -217,18 +216,6 @@ def test_ied_to_em_ratio_is_scale_invariant() -> None:
 def test_degenerate_landmarks_are_rejected(points: list, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         estimate_head(FaceLandmarks5.from_array(np.asarray(points, dtype=np.float32)))
-
-
-def test_rotation_is_requested_only_beyond_tolerance() -> None:
-    tilted = FaceLandmarks5.from_array(
-        np.asarray(
-            [[80.0, 90.0], [120.0, 110.0], [100.0, 125.0], [82.0, 140.0], [118.0, 140.0]],
-            dtype=np.float32,
-        )
-    )
-
-    assert rotation_needed(estimate_head(LEVEL), tolerance_degrees=5.0) == 0.0
-    assert rotation_needed(estimate_head(tilted), tolerance_degrees=5.0) != 0.0
 
 
 # --- crop solving ---------------------------------------------------------------------
