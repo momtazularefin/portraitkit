@@ -5,13 +5,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from portraitkit.detection.contract import (
+from portraitkit.errors import ModelError
+from portraitkit.models.contract import (
     ColorOrder,
     PreprocessContract,
     ResizeMode,
     TensorLayout,
 )
-from portraitkit.errors import ModelError
 from portraitkit.models.session import SessionInfo, TensorSpec
 from portraitkit.types import ImageSize
 from tests.conftest import solid_image

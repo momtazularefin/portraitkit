@@ -1,5 +1,11 @@
 """Model resolution and the ONNX Runtime inference boundary."""
 
+from portraitkit.models.contract import (
+    ColorOrder,
+    PreprocessContract,
+    ResizeMode,
+    TensorLayout,
+)
 from portraitkit.models.registry import DEFAULT_DETECTOR, MODELS, ModelSpec, get_model, model_names
 from portraitkit.models.session import (
     CPU_PROVIDER,
@@ -16,8 +22,12 @@ __all__ = [
     "CPU_PROVIDER",
     "DEFAULT_DETECTOR",
     "MODELS",
+    "ColorOrder",
     "ModelSpec",
+    "PreprocessContract",
+    "ResizeMode",
     "SessionInfo",
+    "TensorLayout",
     "TensorSpec",
     "available_providers",
     "cached_path",

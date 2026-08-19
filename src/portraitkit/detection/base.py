@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from portraitkit.detection.contract import PreprocessContract
 from portraitkit.detection.nms import non_max_suppression
+from portraitkit.models.contract import PreprocessContract
 from portraitkit.models.session import CPU_PROVIDER, create_session, describe_session
 from portraitkit.types import BoundingBox, FaceDetection, FaceLandmarks5, ImageSize
 

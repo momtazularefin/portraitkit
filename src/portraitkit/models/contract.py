@@ -1,5 +1,9 @@
 """Declared preprocessing contracts for model adapters.
 
+Shared by every stage. Detection adapters and matting adapters differ in what they
+decode, not in how an image becomes a tensor, so the contract lives with the model layer
+rather than with either stage.
+
 The legacy archive that preceded PortraitKit contained the same background-removal model
 wrapped twice: one path stretched every input to a square and normalized with ImageNet
 statistics, the other preserved aspect ratio and normalized to ``[-1, 1]``. Both wrappers

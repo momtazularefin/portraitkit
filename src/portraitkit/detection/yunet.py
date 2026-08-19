@@ -15,13 +15,13 @@ from __future__ import annotations
 import numpy as np
 
 from portraitkit.detection.base import FaceDetector, RawDetections
-from portraitkit.detection.contract import (
+from portraitkit.errors import ModelError
+from portraitkit.models.contract import (
     ColorOrder,
     PreprocessContract,
     ResizeMode,
     TensorLayout,
 )
-from portraitkit.errors import ModelError
 from portraitkit.types import ImageSize
 
 __all__ = ["STRIDES", "YuNetDetector", "decode_yunet"]
