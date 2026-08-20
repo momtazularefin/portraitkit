@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "wQcgnzLrIvI=",
+  "success": true,
+  "projectFilePath": "C:\\data\\projects\\rise\\projects\\portraitkit\\samples\\dotnet\\PortraitKit.Sample\\PortraitKit.Sample.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\momta\\.nuget\\packages\\microsoft.ml.onnxruntime\\1.29.0\\microsoft.ml.onnxruntime.1.29.0.nupkg.sha512",
+    "C:\\Users\\momta\\.nuget\\packages\\microsoft.ml.onnxruntime.managed\\1.29.0\\microsoft.ml.onnxruntime.managed.1.29.0.nupkg.sha512",
+    "C:\\Users\\momta\\.nuget\\packages\\system.memory\\4.5.5\\system.memory.4.5.5.nupkg.sha512",
+    "C:\\Users\\momta\\.nuget\\packages\\system.numerics.tensors\\9.0.0\\system.numerics.tensors.9.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

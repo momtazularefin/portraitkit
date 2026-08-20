@@ -32,3 +32,11 @@ jobs:
 
       - name: Pytest
         run: uv run pytest
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build .NET Sample
+        run: dotnet build samples/dotnet/PortraitKit.Sample/PortraitKit.Sample.csproj
