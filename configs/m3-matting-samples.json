@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "name": "p3m-10k-public-samples-10",
+  "source": "https://github.com/JizhiziLi/P3M",
+  "license": "CC-BY-NC-4.0",
+  "license_url": "https://github.com/JizhiziLi/P3M#license",
+  "description": "Ten identity-free synthetic portrait pairs for matting quality evaluation.",
+  "samples": [
+    {
+      "id": "matting-001",
+      "image": "images/sample_001.jpg",
+      "alpha": "masks/sample_001.png"
+    },
+    {
+      "id": "matting-002",
+      "image": "images/sample_002.jpg",
+      "alpha": "masks/sample_002.png"
+    },
+    {
+      "id": "matting-003",
+      "image": "images/sample_003.jpg",
+      "alpha": "masks/sample_003.png"
+    },
+    {
+      "id": "matting-004",
+      "image": "images/sample_004.jpg",
+      "alpha": "masks/sample_004.png"
+    },
+    {
+      "id": "matting-005",
+      "image": "images/sample_005.jpg",
+      "alpha": "masks/sample_005.png"
+    }
+  ]
+}

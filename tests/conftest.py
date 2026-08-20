@@ -13,6 +13,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from portraitkit.types import BoundingBox, FaceDetection, FaceLandmarks5
+
 CODED_WIDTH = 7
 CODED_HEIGHT = 4
 
@@ -85,3 +87,31 @@ def write_tiny_onnx(path: Path, *, dynamic_batch: bool = False) -> Path:
     model.ir_version = 9
     onnx.save(model, str(path))
     return path
+
+
+class StubDetector:
+    """Stands in for a detector adapter so tests can run without model files."""
+
+    def __init__(
+        self,
+        boxes: list[BoundingBox] | None = None,
+        landmarks: list[FaceLandmarks5] | None = None,
+        name: str = "stub-detector",
+        config: object | None = None,
+    ) -> None:
+        from portraitkit.detection.base import DetectorConfig
+        from portraitkit.models.session import SessionInfo
+        from portraitkit.types import FaceDetection
+
+        self.name = name
+        self.config = config or DetectorConfig()
+        self.info = SessionInfo(inputs=(), outputs=(), providers=("CPUExecutionProvider",))
+        self._detections: list[FaceDetection] = []
+        if boxes:
+            for i, box in enumerate(boxes):
+                lm = landmarks[i] if landmarks and i < len(landmarks) else None
+                self._detections.append(FaceDetection(box=box, score=0.95, landmarks=lm))
+
+    def detect(self, image_rgb: np.ndarray) -> tuple[FaceDetection, ...]:
+        del image_rgb
+        return tuple(self._detections)

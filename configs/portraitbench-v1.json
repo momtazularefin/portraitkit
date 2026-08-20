@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "name": "portraitbench-standard-v1",
+  "description": "Standardized robustness benchmark across detection and matting models with parameterized corruptions.",
+  "models": [
+    "yunet-2023mar",
+    "modnet-photographic"
+  ],
+  "datasets": [
+    {
+      "name": "synthetic-face-samples-10",
+      "track": "detection",
+      "manifest": "configs/m2b-ofiq-synthetic.json"
+    },
+    {
+      "name": "synthetic-matting-samples-5",
+      "track": "matting",
+      "manifest": "configs/m3-matting-samples.json"
+    }
+  ],
+  "degradations": [
+    {
+      "name": "clean",
+      "steps": []
+    },
+    {
+      "name": "jpeg_compression_q30",
+      "steps": [
+        {
+          "type": "jpeg",
+          "quality": 30
+        }
+      ]
+    },
+    {
+      "name": "gaussian_blur_s2",
+      "steps": [
+        {
+          "type": "gaussian_blur",
+          "sigma": 2.0
+        }
+      ]
+    },
+    {
+      "name": "low_light_f50",
+      "steps": [
+        {
+          "type": "low_light",
+          "factor": 0.5,
+          "gamma": 1.2
+        }
+      ]
+    },
+    {
+      "name": "sensor_noise_std20",
+      "steps": [
+        {
+          "type": "gaussian_noise",
+          "std": 20.0
+        }
+      ]
+    }
+  ]
+}

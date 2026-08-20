@@ -24,10 +24,23 @@ from portraitkit.detection.stage import DetectionStage, StageConfig, build_detec
 from portraitkit.errors import AnnotationError, PortraitKitError
 from portraitkit.eval.annotations import load_annotations
 from portraitkit.eval.crop import evaluate_crop_quality
+from portraitkit.eval.matting import evaluate_matting
+from portraitkit.eval.matting_annotations import load_matting_annotations
 from portraitkit.eval.runner import evaluate_detection
 from portraitkit.eval.samples import resolve_public_samples
 from portraitkit.imaging.io import load_image
-from portraitkit.models.registry import DEFAULT_DETECTOR, MODELS, model_names
+from portraitkit.matting import (
+    MattingStage,
+    MattingStageConfig,
+    build_matter,
+    parse_color,
+)
+from portraitkit.models.registry import (
+    DEFAULT_DETECTOR,
+    DEFAULT_MATTER,
+    MODELS,
+    model_names,
+)
 from portraitkit.models.store import cached_path, is_cached, resolve_model
 from portraitkit.types import DetectionResult
 
@@ -135,6 +148,59 @@ def build_parser() -> argparse.ArgumentParser:
     ofiq_evaluate.add_argument("--json", action="store_true", help="emit JSON instead of text")
     ofiq_evaluate.add_argument("--output", type=Path, help="write aggregate JSON to this file")
     _detector_options(ofiq_evaluate)
+
+    matte = subcommands.add_parser("matte", help="remove or replace background in images")
+    matte.add_argument("images", nargs="+", type=Path, help="image files to process")
+    matte.add_argument(
+        "--model",
+        default=DEFAULT_MATTER,
+        choices=model_names(),
+        help=f"matting model to use (default: {DEFAULT_MATTER})",
+    )
+    matte.add_argument(
+        "--color",
+        default="white",
+        help="solid background color (name, hex code like '#ffffff', or 'transparent')",
+    )
+    matte.add_argument(
+        "--transparent",
+        action="store_true",
+        help="output transparent PNG (equivalent to --color transparent)",
+    )
+    matte.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="optional binarization threshold in [0, 1]",
+    )
+    matte.add_argument("--json", action="store_true", help="emit JSON instead of text")
+    matte.add_argument("--output", type=Path, help="output directory or file to save result")
+    matte.add_argument(
+        "--offline",
+        action="store_true",
+        help="never download; fail if the model is not already cached",
+    )
+
+    eval_matte = subcommands.add_parser(
+        "evaluate-matting", help="score a matting model against ground truth"
+    )
+    eval_matte.add_argument(
+        "manifest", type=Path, help="matting annotation manifest to evaluate against"
+    )
+    eval_matte.add_argument(
+        "--model",
+        default=DEFAULT_MATTER,
+        choices=model_names(),
+        help=f"matting model to evaluate (default: {DEFAULT_MATTER})",
+    )
+    eval_matte.add_argument("--root", type=Path, help="directory image paths are relative to")
+    eval_matte.add_argument("--json", action="store_true", help="emit JSON instead of text")
+    eval_matte.add_argument("--output", type=Path, help="write the JSON report to this file")
+    eval_matte.add_argument(
+        "--offline",
+        action="store_true",
+        help="never download; fail if the model is not already cached",
+    )
 
     return parser
 
@@ -397,12 +463,109 @@ def _command_ofiq(arguments: argparse.Namespace, stream: Any) -> int:
     return EXIT_OK
 
 
+def _command_matte(arguments: argparse.Namespace, stream: Any) -> int:
+    from PIL import Image
+
+    bg_color = None if arguments.transparent else parse_color(arguments.color)
+    matter = build_matter(
+        arguments.model,
+        allow_download=False if arguments.offline else None,
+    )
+    stage = MattingStage(
+        matter,
+        MattingStageConfig(background_color=bg_color, threshold=arguments.threshold),
+    )
+
+    payload = []
+    for path in arguments.images:
+        image = load_image(path)
+        result = stage.run(image)
+
+        saved_path = None
+        if arguments.output:
+            out_target = arguments.output
+            if len(arguments.images) == 1 and out_target.suffix.lower() in (
+                ".png",
+                ".jpg",
+                ".jpeg",
+            ):
+                save_file = out_target
+            else:
+                out_target.mkdir(parents=True, exist_ok=True)
+                ext = ".png" if bg_color is None else ".jpg"
+                save_file = out_target / f"{path.stem}_matte{ext}"
+
+            save_file.parent.mkdir(parents=True, exist_ok=True)
+            if bg_color is None:
+                Image.fromarray(result.image_rgba, mode="RGBA").save(save_file)
+            else:
+                Image.fromarray(result.image_rgb, mode="RGB").save(save_file)
+            saved_path = str(save_file)
+
+        item = {
+            "path": str(path),
+            "matter": result.matter,
+            "image_size": list(result.image_size.as_tuple()),
+            "duration_ms": round(result.duration_ms, 3),
+            "saved_to": saved_path,
+        }
+        payload.append(item)
+
+        if not arguments.json:
+            save_info = f" -> {saved_path}" if saved_path else ""
+            print(
+                f"{path}: matting via {result.matter} ({result.duration_ms:.1f} ms){save_info}",
+                file=stream,
+            )
+
+    if arguments.json:
+        print(json.dumps({"results": payload}, indent=2), file=stream)
+    return EXIT_OK
+
+
+def _command_evaluate_matting(arguments: argparse.Namespace, stream: Any) -> int:
+    matter = build_matter(
+        arguments.model,
+        allow_download=False if arguments.offline else None,
+    )
+    annotations = load_matting_annotations(arguments.manifest, root=arguments.root)
+    report = evaluate_matting(matter, annotations)
+
+    if arguments.json:
+        print(json.dumps(report.to_dict(), indent=2), file=stream)
+    else:
+        summary = report.summary
+        print(f"dataset {report.dataset} | matter {report.matter}", file=stream)
+        print(
+            f"samples: {summary.evaluated_samples} evaluated, {summary.errored_samples} errored",
+            file=stream,
+        )
+        print(
+            f"mean SAD {summary.mean_sad:.4f}  MSE {summary.mean_mse:.6f}  "
+            f"Grad {summary.mean_gradient:.4f}  Conn {summary.mean_connectivity:.4f}",
+            file=stream,
+        )
+        print(
+            f"median SAD {summary.median_sad:.4f}  MSE {summary.median_mse:.6f}  "
+            f"Grad {summary.median_gradient:.4f}  Conn {summary.median_connectivity:.4f}",
+            file=stream,
+        )
+
+    if arguments.output:
+        report.write(arguments.output)
+        if not arguments.json:
+            print(f"wrote {arguments.output}", file=stream)
+    return EXIT_OK
+
+
 _COMMANDS = {
     "models": _command_models,
     "fetch": _command_fetch,
     "detect": _command_detect,
     "evaluate": _command_evaluate,
     "ofiq": _command_ofiq,
+    "matte": _command_matte,
+    "evaluate-matting": _command_evaluate_matting,
 }
 
 

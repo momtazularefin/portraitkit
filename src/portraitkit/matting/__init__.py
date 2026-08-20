@@ -34,6 +34,13 @@ from portraitkit.matting.rmbg import (
     RMBG14Adapter,
     decode_rmbg,
 )
+from portraitkit.matting.stage import (
+    MattingResult,
+    MattingStage,
+    MattingStageConfig,
+    composite_matte,
+    parse_color,
+)
 from portraitkit.matting.u2net import (
     U2NET_CONTRACT,
     U2NetAdapter,
@@ -53,10 +60,14 @@ __all__ = [
     "MODNetAdapter",
     "MattingAdapter",
     "MattingMetrics",
+    "MattingResult",
+    "MattingStage",
+    "MattingStageConfig",
     "RMBG14Adapter",
     "U2NetAdapter",
     "U2NetPocketAdapter",
     "build_matter",
+    "composite_matte",
     "connectivity_error",
     "decode_birefnet",
     "decode_isnet",
@@ -66,6 +77,7 @@ __all__ = [
     "gradient_error",
     "matting_metrics",
     "mean_squared_error",
+    "parse_color",
     "register_matting_adapter",
     "sum_absolute_difference",
 ]

@@ -43,6 +43,7 @@ dependencies = [
 
 [project.scripts]
 portraitkit = "portraitkit.cli:main"
+portraitbench = "portraitkit.bench.cli:main"
 
 [dependency-groups]
 dev = [

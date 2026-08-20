@@ -296,3 +296,81 @@ def test_ofiq_score_is_offline_capable_and_writes_json(
     assert observed == {"allow_download": False}
     assert "UnifiedQualityScore: scalar 82" in output
     assert json.loads(target.read_text(encoding="utf-8"))["results"][0]["image"] == str(input_path)
+
+
+# --- matte & evaluate-matting --------------------------------------------------------
+
+
+def test_matte_cli_offline_flag_fails_when_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PORTRAITKIT_MODEL_DIR", str(tmp_path / "empty"))
+    input_image = tmp_path / "portrait.jpg"
+    input_image.write_bytes(b"dummy")
+
+    code, _ = run("matte", str(input_image), "--offline")
+
+    assert code == EXIT_ERROR
+
+
+def test_matte_cli_dispatches_stage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    input_path = tmp_path / "portrait.jpg"
+    from PIL import Image
+
+    Image.new("RGB", (30, 40), color="blue").save(input_path)
+
+    from tests.test_matting_stage import DummyMatter
+
+    dummy_matter = DummyMatter()
+    monkeypatch.setattr(cli, "build_matter", lambda *args, **kwargs: dummy_matter)
+
+    output_png = tmp_path / "out.png"
+    code, output = run(
+        "matte",
+        str(input_path),
+        "--transparent",
+        "--output",
+        str(output_png),
+    )
+
+    assert code == EXIT_OK
+    assert "matting via dummy-matter" in output
+    assert output_png.exists()
+
+
+def test_evaluate_matting_cli_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.test_matting_stage import DummyMatter
+
+    dummy_matter = DummyMatter()
+    monkeypatch.setattr(cli, "build_matter", lambda *args, **kwargs: dummy_matter)
+
+    img_path = tmp_path / "test.jpg"
+    alpha_path = tmp_path / "test_alpha.png"
+    from PIL import Image
+
+    Image.new("RGB", (20, 20), color="gray").save(img_path)
+    Image.new("L", (20, 20), color=255).save(alpha_path)
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "name": "cli-matting-eval",
+                "samples": [{"image": "test.jpg", "alpha": "test_alpha.png"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    out_report = tmp_path / "report.json"
+    code, output = run(
+        "evaluate-matting",
+        str(manifest_path),
+        "--output",
+        str(out_report),
+    )
+
+    assert code == EXIT_OK
+    assert "dataset cli-matting-eval | matter dummy-matter" in output
+    assert out_report.exists()
