@@ -31,6 +31,11 @@ venv/
 *.tflite
 *.zip
 
+# .NET build output. Never commit these: the ONNX Runtime native libraries alone are
+# ~170 MB across six target platforms, which would dwarf the entire source tree.
+[Bb]in/
+[Oo]bj/
+
 # Pipeline and benchmark output
 # Note: results/ is deliberately NOT ignored; leaderboard runs are versioned in-repo.
 /output/

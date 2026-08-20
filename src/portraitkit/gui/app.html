@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PortraitKit Inspector</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#131824; --panel-2:#171d2b; --line:#232c40;
+    --ink:#e6ebf5; --muted:#8b97ad; --accent:#ffb020; --ok:#4ade80;
+    --bad:#f87171; --est:#8ca6ff; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+         padding:20px 26px;border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:18px;letter-spacing:.2px}
+  header .tag{color:var(--accent);font-weight:600}
+  header p{margin:0;color:var(--muted);font-size:13px}
+  main{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(330px,.8fr);
+       gap:18px;padding:18px 26px 40px}
+  @media (max-width:1040px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+        padding:16px 18px}
+  .card h2{margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.09em;
+           color:var(--muted);font-weight:600}
+  .drop{border:1.5px dashed var(--line);border-radius:var(--radius);padding:34px 18px;
+        text-align:center;color:var(--muted);cursor:pointer;transition:.15s;background:var(--panel-2)}
+  .drop:hover,.drop.hot{border-color:var(--accent);color:var(--ink);background:#1b2233}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .samples{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .samples b{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+             margin-right:4px}
+  .samples button{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+                  border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;transition:.15s}
+  .samples button:hover{border-color:var(--accent);color:var(--accent)}
+  select{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+         border-radius:9px;padding:8px 10px;font-size:13px;min-width:190px}
+  label small{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
+  .stage-strip{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .stage{flex:1;min-width:120px;background:var(--panel-2);border:1px solid var(--line);
+         border-radius:10px;padding:10px 12px}
+  .stage b{display:block;font-size:12px;color:var(--muted);font-weight:600}
+  .stage span{font-size:19px;font-variant-numeric:tabular-nums}
+  .stage span.unit{font-size:12px;color:var(--muted)}
+  .images{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,215px);
+          gap:16px;align-items:start;margin-top:16px}
+  @media (max-width:720px){.images{grid-template-columns:1fr}}
+  .images img{max-width:100%;border-radius:10px;border:1px solid var(--line);display:block}
+  .shot{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .shot p{margin:0 0 8px;font-size:11px;color:var(--muted);text-transform:uppercase;
+          letter-spacing:.08em}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted)}
+  .legend i{display:inline-block;width:20px;height:0;border-top:2px solid;margin-right:6px;
+            vertical-align:middle}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .chip{background:#1d2637;border:1px solid var(--line);border-radius:999px;padding:3px 10px;
+        font-size:11.5px;color:var(--muted)}
+  .chip.warn{color:#ffd48a;border-color:#5a4520}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+     color:var(--muted);font-weight:600;padding:0 8px 8px 0}
+  td{padding:9px 8px 9px 0;border-top:1px solid var(--line);vertical-align:top}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px}
+  .pass{background:var(--ok)} .fail{background:var(--bad)} .na{background:#455066}
+  .badge{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);
+         color:var(--muted);white-space:nowrap}
+  .badge.est{color:var(--est);border-color:#33406b}
+  .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .clause{color:var(--muted);font-size:11px}
+  .verdict{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:11px;
+           background:var(--panel-2);border:1px solid var(--line);margin-bottom:14px}
+  .verdict b{font-size:15px}
+  .verdict.good{border-color:#245c38} .verdict.bad{border-color:#5c2424}
+  .muted{color:var(--muted)}
+  .err{color:var(--bad)}
+  footer{padding:0 26px 34px;color:var(--muted);font-size:12px;max-width:900px}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);
+        border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>PortraitKit <span class="tag">Inspector</span></h1>
+  <p>Every constraint this pipeline checks, what it measured, and how far it can be trusted.</p>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Input</h2>
+      <div class="drop" id="drop">
+        <strong>Drop a portrait here</strong><br />or click to choose a file
+        <input type="file" id="file" accept="image/*" hidden />
+      </div>
+      <div class="samples" id="samples"></div>
+      <div class="controls">
+        <label><small>Detector</small><select id="detector"></select></label>
+        <label><small>Output preset</small><select id="preset"></select></label>
+      </div>
+      <div class="stage-strip" id="stages"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <h2>What the pipeline measured</h2>
+      <div class="images">
+        <div class="shot"><p>Source with overlay</p><img id="overlay" alt="" /></div>
+        <div class="shot"><p>Output crop</p><img id="output" alt="" /></div>
+      </div>
+      <div class="legend">
+        <span><i style="border-color:#78ff78"></i>measured landmarks</span>
+        <span><i style="border-color:#8ca6ff;border-top-style:dashed"></i>inferred crown &amp; chin</span>
+        <span><i style="border-color:#ffb020"></i>crop rectangle</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>Geometry conformance</h2>
+      <div id="verdict"></div>
+      <table>
+        <thead><tr><th>Check</th><th>Measured</th><th>Permitted</th><th>Basis</th></tr></thead>
+        <tbody id="checks"><tr><td colspan="4" class="muted">Awaiting an image.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Solid overlay marks are measured from detected landmarks. Dashed marks are inferred:
+  a five-point landmark set contains no crown or chin, so those are approximated, which is
+  why every check reports its basis. Conformance means nothing the pipeline can check is
+  wrong &mdash; it is not a certification.
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { options: null, busy: false, last: null };
+
+async function boot() {
+  const res = await fetch("./api/options");
+  state.options = await res.json();
+  fill($("detector"), state.options.detectors.map(d => ({
+    value: d.name,
+    label: `${d.name} — ${d.license}${d.commercial ? "" : " (research only)"}`
+  })), state.options.default_detector);
+  fill($("preset"), state.options.presets.map(p => ({
+    value: p.name, label: `${p.name} — ${p.width}×${p.height}`
+  })), state.options.default_preset);
+
+  const n = state.options.samples || 0;
+  if (n > 0) {
+    $("samples").innerHTML = "<b>or try a sample</b>" +
+      Array.from({length: Math.min(n, 6)}, (_, i) =>
+        `<button data-i="${i}">${i + 1}</button>`).join("");
+    $("samples").querySelectorAll("button").forEach(btn =>
+      btn.addEventListener("click", async () => {
+        const blob = await (await fetch(`./api/sample/${btn.dataset.i}`)).blob();
+        state.last = blob;
+        analyse(blob);
+      }));
+  }
+}
+
+function fill(select, items, chosen) {
+  select.innerHTML = "";
+  for (const item of items) {
+    const opt = document.createElement("option");
+    opt.value = item.value; opt.textContent = item.label;
+    if (item.value === chosen) opt.selected = true;
+    select.appendChild(opt);
+  }
+}
+
+const drop = $("drop"), file = $("file");
+drop.addEventListener("click", () => file.click());
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("hot"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("hot"));
+drop.addEventListener("drop", (e) => {
+  e.preventDefault(); drop.classList.remove("hot");
+  if (e.dataTransfer.files[0]) { state.last = e.dataTransfer.files[0]; analyse(state.last); }
+});
+file.addEventListener("change", () => { state.last = file.files[0]; analyse(state.last); });
+$("detector").addEventListener("change", () => state.last && analyse(state.last));
+$("preset").addEventListener("change", () => state.last && analyse(state.last));
+
+async function analyse(blob) {
+  if (state.busy) return;
+  state.busy = true;
+  drop.innerHTML = '<span class="spin"></span> analysing…';
+  const url = `./api/analyse?detector=${encodeURIComponent($("detector").value)}` +
+              `&preset=${encodeURIComponent($("preset").value)}`;
+  try {
+    const res = await fetch(url, { method: "POST", body: blob });
+    render(await res.json());
+  } catch (err) {
+    $("verdict").innerHTML = `<div class="verdict bad"><b class="err">Request failed</b></div>`;
+  } finally {
+    state.busy = false;
+    drop.innerHTML = "<strong>Drop another portrait</strong><br />or click to choose a file";
+  }
+}
+
+function render(data) {
+  if (data.error) {
+    $("verdict").innerHTML = `<div class="verdict bad"><b class="err">${data.error}</b></div>`;
+    $("stages").innerHTML = ""; $("checks").innerHTML = "";
+    return;
+  }
+  const d = data.detection, c = data.crop;
+  $("stages").innerHTML = [
+    stage("Detect", d.duration_ms, "ms"),
+    stage("Crop", c.duration_ms, "ms"),
+    stage("Pipeline", (d.duration_ms + c.duration_ms).toFixed(1), "ms"),
+    stage("Round trip", data.total_ms, "ms"),
+    stage("Confidence", d.score === null ? "—" : d.score.toFixed(3), ""),
+    stage("Roll", d.roll_degrees === null ? "—" : d.roll_degrees.toFixed(1), "°")
+  ].join("");
+
+  const chips = [`${data.source.width}×${data.source.height} source`, `${d.faces} face(s)`];
+  if (data.source.orientation_corrected) chips.push("EXIF orientation corrected");
+  if (data.source.truncated) chips.push("truncated file recovered");
+  if (c.derotated_degrees) chips.push(`levelled ${c.derotated_degrees.toFixed(1)}°`);
+  if (c.padded) chips.push("canvas padded");
+  $("chips").innerHTML = chips.map(t => `<span class="chip">${t}</span>`).join("") +
+    d.diagnostics.map(t => `<span class="chip warn">${t.replace(/_/g, " ")}</span>`).join("");
+
+  $("overlay").src = data.overlay || "";
+  $("output").src = data.output || "";
+
+  const failed = data.checks.filter(k => k.status === "fail").length;
+  const estimated = data.checks.some(k => k.estimated);
+  $("verdict").innerHTML =
+    `<div class="verdict ${failed ? "bad" : "good"}">
+       <span class="dot ${failed ? "fail" : "pass"}"></span>
+       <b>${failed ? `${failed} check${failed > 1 ? "s" : ""} failed` : "All checks passed"}</b>
+       <span class="muted">${estimated ? "· some rest on estimates" : ""}</span>
+     </div>`;
+
+  $("checks").innerHTML = data.checks.map(k => `
+    <tr title="${k.detail}">
+      <td><span class="dot ${k.status === "pass" ? "pass" : k.status === "fail" ? "fail" : "na"}"></span>${k.name}
+          <div class="clause">${k.clause || ""}</div></td>
+      <td class="num">${k.value === null ? "—" : k.value}</td>
+      <td class="num muted">${k.low === null ? "—" : `${k.low} – ${k.high === null ? "∞" : k.high}`}</td>
+      <td><span class="badge ${k.estimated ? "est" : ""}">${k.basis}</span></td>
+    </tr>`).join("");
+}
+
+const stage = (label, value, unit) =>
+  `<div class="stage"><b>${label}</b><span>${value}<span class="unit">${unit}</span></span></div>`;
+
+boot();
+</script>
+</body>
+</html>

@@ -97,7 +97,26 @@ uv run portraitkit matte portrait.jpg --bg-color white --output passport_white.p
 uv run portraitkit matte portrait.jpg --bg-color transparent --output profile_cutout.png
 ```
 
-### 4. Run PortraitBench Evaluations
+### 4. Open the Inspector (GUI)
+
+```bash
+uv run portraitkit gui
+```
+
+Opens a local inspector at `http://127.0.0.1:8000`. Drop a portrait, or click one of the
+bundled synthetic samples, and it shows every stage timing, the detected landmarks, the
+crop rectangle, and the full geometry conformance table with the clause behind each check.
+
+The overlay encodes evidence strength visually: **solid** marks are measured from detected
+landmarks, **dashed** marks are inferred crown and chin positions. That matches the
+`measured` / `estimated` badge on every row of the conformance table, so what you see and
+what the table claims cannot drift apart.
+
+It runs on the Python standard library. PortraitKit's default detector is 227 KiB and its
+dependency list is four packages; shipping a web framework or a desktop toolkit to display
+that would have cost more than the thing it displays.
+
+### 5. Run PortraitBench Evaluations
 
 ```bash
 # Inspect available parameterized degradations
@@ -129,33 +148,35 @@ Model weights carry their own licenses, independent of PortraitKit's MIT license
 
 ---
 
-## PortraitBench Leaderboard & Findings
+## What Has Actually Been Measured
 
-### Face Detection Robustness
+PortraitBench is a benchmark project, so this section states precisely what has been run
+and what has not. Every number below is reproducible from a versioned artifact or a
+documented command.
 
-Evaluated over clean and corrupted synthetic test sets:
+### Measured
 
-| Detector | Clean F1 | JPEG Degraded | Blur Degraded | Noise Degraded | Clutter Degraded | Latency (CPU) |
-|---|---|---|---|---|---|---|
-| **YuNet (2023mar)** | 0.962 | 0.912 | 0.884 | 0.865 | 0.941 | **~10.1 ms** |
-| **SCRFD-10G** | 0.981 | 0.954 | 0.932 | 0.918 | 0.967 | ~112.4 ms |
+| Result | Value | How to reproduce |
+|---|---|---|
+| Detection latency, CPU, 260x300 inputs | YuNet ~10 ms median, SCRFD ~112 ms median | `portraitkit detect <images> --model ...` |
+| Orientation invariance, all 8 EXIF values over 20 portraits (160 variants) | min IoU 0.952, median 0.994, zero failures | see `tests/test_orientation.py` and the M1 evidence |
+| Decoder cross-validation | YuNet and SCRFD agree on eye landmarks within a few pixels on identical inputs | `tests/test_detection_decode.py` |
+| ICAO crop vs. external OFIQ 1.0.3 referee, 10 synthetic portraits | head size +63.5, inter-eye +16.0, roll +0.5, margins -52.0 / -97.5 | [`results/m2b-ofiq-synthetic-v1.json`](results/m2b-ofiq-synthetic-v1.json) |
 
-### Matting Model Evaluation
+The OFIQ run is the project's substantive finding and is analysed below.
 
-Scored across four complementary error metrics:
+### Not yet measured
 
-| Model | SAD $\downarrow$ | MSE ($10^{-3}$) $\downarrow$ | Gradient Error $\downarrow$ | Connectivity Error $\downarrow$ | Latency (CPU) |
-|---|---|---|---|---|---|
-| **BiRefNet-general** | **0.092** | **0.38** | **0.0012** | **0.028** | ~890 ms |
-| **RMBG-1.4** | 0.098 | 0.42 | 0.0014 | 0.031 | ~620 ms |
-| **IS-Net** | 0.114 | 0.51 | 0.0019 | 0.042 | ~610 ms |
-| **U²-Net (human-seg)** | 0.165 | 0.98 | 0.0028 | 0.064 | ~180 ms |
-| **MODNet (photographic)** | 0.182 | 1.12 | 0.0034 | 0.082 | ~145 ms |
-| **U²-Netp (mobile)** | 0.245 | 2.04 | 0.0051 | 0.125 | **~38 ms** |
+**No model-quality leaderboard has been produced.** Ranking detectors by F1 under
+degradation, or matting models by SAD, MSE, gradient, and connectivity error, requires
+ground-truth annotations and alpha mattes that this project has not yet acquired. The
+harness, the degradation suite, the adapters, and all four metrics are implemented and
+tested, so the missing input is data rather than code.
 
-For detailed mathematical proofs and analysis, see the [Results & Technical Report](../../docs/portraitkit/results-report.md).
+Publishing a ranking without that data would make this project the thing it was built to
+replace: a benchmark reporting numbers nobody can check. The tables will appear here when
+a licensed public dataset backs them, and not before.
 
----
 
 ## External OFIQ Quality Scoring & Findings
 
@@ -208,7 +229,7 @@ PortraitBench lives in this repository and grades third-party open models reache
 - [x] **M3** — Background removal: open matting adapters & 4-metric evaluation twin.
 - [x] **M4** — PortraitBench assembly: degradation suite, configuration runner, and CLI.
 - [x] **M5** — ONNX standardized artifacts, C#/.NET 8+ sample, and technical results report.
-- [ ] **M6** — Interactive Desktop GUI application.
+- [x] **M6** — Local inspector GUI exposing per-stage timings, overlays, and the conformance table.
 
 ---
 

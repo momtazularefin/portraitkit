@@ -107,6 +107,12 @@ def build_parser() -> argparse.ArgumentParser:
     detect.add_argument("--output", type=Path, help="write JSON results to this file")
     _detector_options(detect)
 
+    gui = subcommands.add_parser("gui", help="open the local inspector UI in a browser")
+    gui.add_argument("--host", default="127.0.0.1", help="interface to bind (loopback by default)")
+    gui.add_argument("--port", type=int, default=8000, help="port to serve on")
+    gui.add_argument("--no-browser", action="store_true", help="do not open a browser")
+    gui.add_argument("--offline", action="store_true", help="never download models")
+
     evaluate = subcommands.add_parser("evaluate", help="score the stage against ground truth")
     evaluate.add_argument("manifest", type=Path, help="annotation manifest to evaluate against")
     evaluate.add_argument("--root", type=Path, help="directory image paths are relative to")
@@ -325,6 +331,19 @@ def _command_detect(arguments: argparse.Namespace, stream: Any) -> int:
         )
         if not arguments.json:
             print(f"wrote {arguments.output}", file=stream)
+    return EXIT_OK
+
+
+def _command_gui(arguments: argparse.Namespace, stream: Any) -> int:
+    from portraitkit.gui.server import serve
+
+    del stream  # the server prints its own address
+    serve(
+        host=arguments.host,
+        port=arguments.port,
+        open_browser=not arguments.no_browser,
+        allow_download=False if arguments.offline else None,
+    )
     return EXIT_OK
 
 
@@ -563,6 +582,7 @@ _COMMANDS = {
     "fetch": _command_fetch,
     "detect": _command_detect,
     "evaluate": _command_evaluate,
+    "gui": _command_gui,
     "ofiq": _command_ofiq,
     "matte": _command_matte,
     "evaluate-matting": _command_evaluate_matting,
